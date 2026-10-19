@@ -31,6 +31,33 @@ export interface NearbyEvent {
   venue_lat: number;
   venue_lng: number;
   distance_km: number;
+  going_count: number;
+}
+
+export interface Attendee {
+  user_id: string;
+  display_name: string;
+  avatar_url: string | null;
+}
+
+export interface IncomingRequest {
+  id: string;
+  requester_id: string;
+  requester_name: string;
+  occurrence_id: string | null;
+  message: string | null;
+  status: "pending" | "approved" | "denied";
+  created_at: string;
+}
+
+export interface OutgoingRequest {
+  id: string;
+  recipient_id: string;
+  recipient_name: string;
+  occurrence_id: string | null;
+  status: "pending" | "approved" | "denied";
+  shared_phone: string | null;
+  created_at: string;
 }
 
 /** Shape the extractor (Claude) returns for each event on a venue page. */

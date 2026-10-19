@@ -76,6 +76,23 @@ npm run newsletter:add -- zebulon-la substack.com "Zebulon"   # shared ESP domai
 
 Unmatched emails are logged in `inbound_emails` for review.
 
+### Accounts, RSVP & private contact exchange
+
+Optional, privacy-first social layer:
+
+- **Sign in** with Google/Facebook (Supabase Auth) — enable the providers in the Supabase
+  dashboard and add `<site>/auth/callback` as a redirect URL. One tap, no passwords.
+- **RSVP** — "I'm going" on any event; the feed shows a going-count and a **names-only** attendee
+  list (`/api` RPC `occurrence_attendees` — never returns contact info).
+- **Contact exchange** — instead of posting phone numbers in a shared space, you **request** an
+  attendee's contact; they **approve or deny** from their **`/inbox`**; the number is revealed to
+  the requester only on approval (RPC `get_shared_contact`/`outgoing_contact_requests`). Phones
+  live in private `profiles` rows guarded by RLS.
+- **Moderation foundation** — `blocks` and `reports` tables; requests carry a short, reportable
+  note. (A public, moderated group chat is schema-ready and the next increment.)
+- **Demo mode** — with no Supabase configured, sign-in/RSVP/requests are simulated in
+  `localStorage` so the whole flow is clickable offline.
+
 ### Admin review (`/admin`)
 
 A single screen to triage what to add. It merges community **submissions** and crawler-discovered

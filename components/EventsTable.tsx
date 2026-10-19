@@ -9,6 +9,7 @@ import {
   formatTime,
   priceValue,
 } from "@/lib/format";
+import GoingButton from "./GoingButton";
 
 type SortKey = "when" | "title" | "venue" | "category" | "price" | "distance";
 type Dir = "asc" | "desc";
@@ -33,7 +34,13 @@ function valueFor(e: NearbyEvent, key: SortKey): string | number {
   }
 }
 
-export default function EventsTable({ events }: { events: NearbyEvent[] }) {
+export default function EventsTable({
+  events,
+  onShowAttendees,
+}: {
+  events: NearbyEvent[];
+  onShowAttendees?: (ev: NearbyEvent) => void;
+}) {
   const [sort, setSort] = useState<SortKey>("when");
   const [dir, setDir] = useState<Dir>("asc");
 
@@ -74,6 +81,7 @@ export default function EventsTable({ events }: { events: NearbyEvent[] }) {
               </th>
             ))}
             <th className="px-4 py-3 font-medium">Vibe</th>
+            <th className="px-4 py-3 font-medium">Going</th>
           </tr>
         </thead>
         <tbody>
@@ -123,6 +131,9 @@ export default function EventsTable({ events }: { events: NearbyEvent[] }) {
                       </span>
                     ))}
                   </div>
+                </td>
+                <td className="px-4 py-3">
+                  <GoingButton ev={e} onShowAttendees={onShowAttendees} compact />
                 </td>
               </tr>
             );

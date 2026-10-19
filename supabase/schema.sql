@@ -128,6 +128,90 @@ create index if not exists idx_events_venue  on events(venue_id);
 create index if not exists idx_venues_latlng on venues(lat, lng);
 create index if not exists idx_cand_status   on candidate_venues(status, score desc);
 
+-- ===========================================================================
+-- Accounts, RSVPs, and privacy-first contact exchange
+-- ===========================================================================
+
+-- Public-facing profile. `phone` is PRIVATE: it is never returned by a public
+-- query and is revealed only through an approved contact request.
+create table if not exists profiles (
+  id           uuid primary key references auth.users(id) on delete cascade,
+  display_name text,
+  avatar_url   text,
+  phone        text,                  -- private
+  share_phone  boolean default true,  -- may this be shared on approval?
+  created_at   timestamptz default now()
+);
+
+-- Auto-create a profile when someone signs up (name/avatar from the OAuth provider).
+create or replace function handle_new_user()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  insert into public.profiles (id, display_name, avatar_url)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
+    new.raw_user_meta_data->>'avatar_url'
+  )
+  on conflict (id) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function handle_new_user();
+
+-- "I'm going" to a specific occurrence.
+create table if not exists rsvps (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid not null references auth.users(id) on delete cascade,
+  occurrence_id uuid not null references event_occurrences(id) on delete cascade,
+  created_at    timestamptz default now(),
+  unique (user_id, occurrence_id)
+);
+create index if not exists idx_rsvps_occ on rsvps(occurrence_id);
+
+-- Request someone's contact; they approve/deny. On approval the requester may
+-- read the recipient's phone (via get_shared_contact), never otherwise.
+create table if not exists contact_requests (
+  id            uuid primary key default gen_random_uuid(),
+  occurrence_id uuid references event_occurrences(id) on delete set null,
+  requester_id  uuid not null references auth.users(id) on delete cascade,
+  recipient_id  uuid not null references auth.users(id) on delete cascade,
+  message       text,                 -- short note, moderated/reportable
+  status        text default 'pending', -- pending | approved | denied
+  created_at    timestamptz default now(),
+  responded_at  timestamptz,
+  unique (requester_id, recipient_id, occurrence_id),
+  check (requester_id <> recipient_id)
+);
+create index if not exists idx_cr_recipient on contact_requests(recipient_id, status);
+create index if not exists idx_cr_requester on contact_requests(requester_id, status);
+
+-- Moderation foundation.
+create table if not exists blocks (
+  blocker_id uuid not null references auth.users(id) on delete cascade,
+  blocked_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz default now(),
+  primary key (blocker_id, blocked_id)
+);
+
+create table if not exists reports (
+  id          uuid primary key default gen_random_uuid(),
+  reporter_id uuid references auth.users(id) on delete set null,
+  subject_id  uuid references auth.users(id) on delete set null, -- reported user
+  kind        text,   -- contact_request | message | profile
+  ref_id      uuid,   -- id of the offending row
+  reason      text,
+  status      text default 'open',  -- open | reviewed | actioned
+  created_at  timestamptz default now()
+);
+
 -- ---------------------------------------------------------------------------
 -- nearby_events: upcoming occurrences within a radius of a point.
 -- Uses the haversine formula directly so no PostGIS/earthdistance extension
@@ -158,7 +242,8 @@ returns table (
   venue_address          text,
   venue_lat              double precision,
   venue_lng              double precision,
-  distance_km            double precision
+  distance_km            double precision,
+  going_count            bigint
 )
 language sql
 stable
@@ -178,10 +263,14 @@ as $$
           cos(radians(v.lng) - radians(in_lng)) +
           sin(radians(in_lat)) * sin(radians(v.lat))
         ))
-      )) as distance_km
+      )) as distance_km,
+      coalesce(r.c, 0) as going_count
     from event_occurrences o
     join events e on e.id = o.event_id
     join venues v on v.id = e.venue_id
+    left join (
+      select occurrence_id, count(*)::bigint as c from rsvps group by occurrence_id
+    ) r on r.occurrence_id = o.id
     where v.active
       and v.lat is not null
       and v.lng is not null
@@ -192,6 +281,50 @@ as $$
   from scored
   where distance_km <= in_radius_km
   order by starts_at asc, distance_km asc;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Social RPCs (SECURITY DEFINER so they can read across users, but each one
+-- filters by auth.uid() and returns only non-private fields — phone is only
+-- ever returned to an approved requester via get_shared_contact).
+-- ---------------------------------------------------------------------------
+
+-- Names-only attendee list for an occurrence (no PII).
+create or replace function occurrence_attendees(in_occurrence_id uuid)
+returns table (user_id uuid, display_name text, avatar_url text)
+language sql stable security definer set search_path = public as $$
+  select p.id, coalesce(p.display_name, 'Guest'), p.avatar_url
+  from rsvps rs
+  join profiles p on p.id = rs.user_id
+  where rs.occurrence_id = in_occurrence_id
+  order by rs.created_at;
+$$;
+
+-- Contact requests addressed to me (with requester name), hiding blocked users.
+create or replace function incoming_contact_requests()
+returns table (id uuid, requester_id uuid, requester_name text, occurrence_id uuid, message text, status text, created_at timestamptz)
+language sql stable security definer set search_path = public as $$
+  select cr.id, cr.requester_id, coalesce(p.display_name, 'Someone'),
+         cr.occurrence_id, cr.message, cr.status, cr.created_at
+  from contact_requests cr
+  join profiles p on p.id = cr.requester_id
+  where cr.recipient_id = auth.uid()
+    and not exists (select 1 from blocks b where b.blocker_id = auth.uid() and b.blocked_id = cr.requester_id)
+  order by cr.created_at desc;
+$$;
+
+-- My outgoing requests; phone is included only when approved and shared.
+create or replace function outgoing_contact_requests()
+returns table (id uuid, recipient_id uuid, recipient_name text, occurrence_id uuid, status text, shared_phone text, created_at timestamptz)
+language sql stable security definer set search_path = public as $$
+  select cr.id, cr.recipient_id, coalesce(p.display_name, 'Someone'),
+         cr.occurrence_id, cr.status,
+         case when cr.status = 'approved' and p.share_phone then p.phone else null end,
+         cr.created_at
+  from contact_requests cr
+  join profiles p on p.id = cr.recipient_id
+  where cr.requester_id = auth.uid()
+  order by cr.created_at desc;
 $$;
 
 -- ---------------------------------------------------------------------------
@@ -219,3 +352,38 @@ create policy "public read venues"     on venues            for select using (ac
 create policy "public read events"      on events            for select using (true);
 create policy "public read occurrences" on event_occurrences for select using (true);
 -- submissions: no anon policy -> only the service role (server) can read/write them.
+
+-- Account/social tables: users act only on their own rows.
+alter table profiles         enable row level security;
+alter table rsvps            enable row level security;
+alter table contact_requests enable row level security;
+alter table blocks           enable row level security;
+alter table reports          enable row level security;
+
+drop policy if exists "profile read own"   on profiles;
+drop policy if exists "profile insert own" on profiles;
+drop policy if exists "profile update own" on profiles;
+create policy "profile read own"   on profiles for select using (auth.uid() = id);
+create policy "profile insert own" on profiles for insert with check (auth.uid() = id);
+create policy "profile update own" on profiles for update using (auth.uid() = id);
+
+drop policy if exists "rsvp read own"   on rsvps;
+drop policy if exists "rsvp insert own" on rsvps;
+drop policy if exists "rsvp delete own" on rsvps;
+create policy "rsvp read own"   on rsvps for select using (auth.uid() = user_id);
+create policy "rsvp insert own" on rsvps for insert with check (auth.uid() = user_id);
+create policy "rsvp delete own" on rsvps for delete using (auth.uid() = user_id);
+
+drop policy if exists "cr read involved"     on contact_requests;
+drop policy if exists "cr insert requester"  on contact_requests;
+drop policy if exists "cr update recipient"  on contact_requests;
+create policy "cr read involved"    on contact_requests for select using (auth.uid() = requester_id or auth.uid() = recipient_id);
+create policy "cr insert requester" on contact_requests for insert with check (auth.uid() = requester_id);
+create policy "cr update recipient" on contact_requests for update using (auth.uid() = recipient_id);
+
+drop policy if exists "blocks own" on blocks;
+create policy "blocks own" on blocks for all using (auth.uid() = blocker_id) with check (auth.uid() = blocker_id);
+
+drop policy if exists "reports insert own" on reports;
+create policy "reports insert own" on reports for insert with check (auth.uid() = reporter_id);
+-- reports are reviewed via the service role (admin); no public read.

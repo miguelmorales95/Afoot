@@ -203,6 +203,7 @@ export function demoNearby(lat: number, lng: number, radiusKm = 40): NearbyEvent
           venue_lat: s.lat,
           venue_lng: s.lng,
           distance_km: distance,
+          going_count: ((i + 1) * 3 + dow + w) % 9,
         });
       });
     });
