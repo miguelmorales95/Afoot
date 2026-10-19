@@ -34,13 +34,7 @@ function valueFor(e: NearbyEvent, key: SortKey): string | number {
   }
 }
 
-export default function EventsTable({
-  events,
-  onShowAttendees,
-}: {
-  events: NearbyEvent[];
-  onShowAttendees?: (ev: NearbyEvent) => void;
-}) {
+export default function EventsTable({ events }: { events: NearbyEvent[] }) {
   const [sort, setSort] = useState<SortKey>("when");
   const [dir, setDir] = useState<Dir>("asc");
 
@@ -133,7 +127,7 @@ export default function EventsTable({
                   </div>
                 </td>
                 <td className="px-4 py-3">
-                  <GoingButton ev={e} onShowAttendees={onShowAttendees} compact />
+                  <GoingButton ev={e} compact />
                 </td>
               </tr>
             );

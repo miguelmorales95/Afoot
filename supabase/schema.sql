@@ -242,8 +242,7 @@ returns table (
   venue_address          text,
   venue_lat              double precision,
   venue_lng              double precision,
-  distance_km            double precision,
-  going_count            bigint
+  distance_km            double precision
 )
 language sql
 stable
@@ -277,10 +276,16 @@ as $$
       and o.starts_at >= now()
       and o.starts_at <= now() + make_interval(days => in_days_ahead)
   )
-  select *
+  -- going_count is intentionally NOT returned (attendance is private). It is
+  -- used only to rank events: more-popular events surface higher within a day.
+  select
+    occurrence_id, event_id, title, description, category, price, url,
+    recurrence_description, is_recurring, tags, starts_at, ends_at,
+    venue_id, venue_name, venue_address, venue_lat, venue_lng, distance_km
   from scored
   where distance_km <= in_radius_km
-  order by starts_at asc, distance_km asc;
+  order by (starts_at at time zone 'America/Los_Angeles')::date asc,
+           going_count desc, starts_at asc, distance_km asc;
 $$;
 
 -- ---------------------------------------------------------------------------
@@ -289,7 +294,8 @@ $$;
 -- ever returned to an approved requester via get_shared_contact).
 -- ---------------------------------------------------------------------------
 
--- Names-only attendee list for an occurrence (no PII).
+-- Names-only attendee list for an occurrence (no PII). Attendance is private:
+-- you only see who's going if YOU are also going (i.e. you're in the chat).
 create or replace function occurrence_attendees(in_occurrence_id uuid)
 returns table (user_id uuid, display_name text, avatar_url text)
 language sql stable security definer set search_path = public as $$
@@ -297,7 +303,40 @@ language sql stable security definer set search_path = public as $$
   from rsvps rs
   join profiles p on p.id = rs.user_id
   where rs.occurrence_id = in_occurrence_id
+    and exists (
+      select 1 from rsvps me
+      where me.occurrence_id = in_occurrence_id and me.user_id = auth.uid()
+    )
   order by rs.created_at;
+$$;
+
+-- Event chat messages. Only people who RSVP'd ("going") can read or post.
+create table if not exists messages (
+  id            uuid primary key default gen_random_uuid(),
+  occurrence_id uuid not null references event_occurrences(id) on delete cascade,
+  user_id       uuid not null references auth.users(id) on delete cascade,
+  body          text not null,
+  created_at    timestamptz default now()
+);
+create index if not exists idx_messages_occ on messages(occurrence_id, created_at);
+
+-- Chat messages for an occurrence: gated on the caller being going, and hiding
+-- anyone the caller has blocked. (SECURITY DEFINER but filtered by auth.uid().)
+create or replace function occurrence_messages(in_occurrence_id uuid)
+returns table (id uuid, user_id uuid, display_name text, body text, created_at timestamptz)
+language sql stable security definer set search_path = public as $$
+  select m.id, m.user_id, coalesce(p.display_name, 'Guest'), m.body, m.created_at
+  from messages m
+  join profiles p on p.id = m.user_id
+  where m.occurrence_id = in_occurrence_id
+    and exists (
+      select 1 from rsvps me
+      where me.occurrence_id = in_occurrence_id and me.user_id = auth.uid()
+    )
+    and not exists (
+      select 1 from blocks b where b.blocker_id = auth.uid() and b.blocked_id = m.user_id
+    )
+  order by m.created_at;
 $$;
 
 -- Contact requests addressed to me (with requester name), hiding blocked users.
@@ -387,3 +426,15 @@ create policy "blocks own" on blocks for all using (auth.uid() = blocker_id) wit
 drop policy if exists "reports insert own" on reports;
 create policy "reports insert own" on reports for insert with check (auth.uid() = reporter_id);
 -- reports are reviewed via the service role (admin); no public read.
+
+-- Event chat: read/post only if you RSVP'd to that occurrence.
+alter table messages enable row level security;
+drop policy if exists "messages read if going"   on messages;
+drop policy if exists "messages insert if going" on messages;
+create policy "messages read if going" on messages for select using (
+  exists (select 1 from rsvps r where r.occurrence_id = messages.occurrence_id and r.user_id = auth.uid())
+);
+create policy "messages insert if going" on messages for insert with check (
+  user_id = auth.uid()
+  and exists (select 1 from rsvps r where r.occurrence_id = messages.occurrence_id and r.user_id = auth.uid())
+);

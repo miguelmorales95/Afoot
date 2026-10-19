@@ -3,7 +3,7 @@
 // Client-only localStorage simulation of accounts/RSVP/contact-exchange, so the
 // whole flow is clickable in demo mode (no Supabase). Mirrors the real schema.
 
-import type { Attendee, IncomingRequest, OutgoingRequest } from "./types";
+import type { Attendee, ChatMessage, IncomingRequest, OutgoingRequest } from "./types";
 
 const POOL = ["Jordan", "Alex", "Sam", "Taylor", "Mia", "Chris", "Priya", "Diego", "Noah", "Lena"];
 
@@ -109,6 +109,43 @@ export function demoAddOutgoing(recipient: Attendee, occurrenceId: string | null
   });
   write(OUT_KEY, list);
   return "sent";
+}
+
+// --- demo event chat (per occurrence) ---
+const CHAT_PREFIX = "whatsup_demo_chat_";
+
+function seedChat(occurrenceId: string): ChatMessage[] {
+  const who = demoAttendees(occurrenceId);
+  const a = who[0]?.display_name ?? "Jordan";
+  const b = who[1]?.display_name ?? "Sam";
+  const now = Date.now();
+  return [
+    { id: "m1", user_id: `demo-p-${a}`, display_name: a, body: "Anyone grabbing seats early?", created_at: new Date(now - 7200000).toISOString() },
+    { id: "m2", user_id: `demo-p-${b}`, display_name: b, body: "I'll be there around 8, save me a spot 🙌", created_at: new Date(now - 3600000).toISOString() },
+  ];
+}
+
+export function demoMessages(occurrenceId: string): ChatMessage[] {
+  const key = CHAT_PREFIX + occurrenceId;
+  const existing = read<ChatMessage[] | null>(key, null);
+  if (existing) return existing;
+  const seeded = seedChat(occurrenceId);
+  write(key, seeded);
+  return seeded;
+}
+
+export function demoSendMessage(occurrenceId: string, user: { id: string; name: string }, body: string): ChatMessage {
+  const key = CHAT_PREFIX + occurrenceId;
+  const list = demoMessages(occurrenceId);
+  const msg: ChatMessage = {
+    id: `m-${Date.now()}`,
+    user_id: user.id,
+    display_name: user.name,
+    body,
+    created_at: new Date().toISOString(),
+  };
+  write(key, [...list, msg]);
+  return msg;
 }
 
 export interface DemoProfile {

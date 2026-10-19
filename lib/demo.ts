@@ -203,12 +203,27 @@ export function demoNearby(lat: number, lng: number, radiusKm = 40): NearbyEvent
           venue_lat: s.lat,
           venue_lng: s.lng,
           distance_km: distance,
-          going_count: ((i + 1) * 3 + dow + w) % 9,
         });
       });
     });
   });
-  return rows.sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+  // Hidden popularity (not exposed): rank more-popular events higher within a
+  // day, mirroring the server's nearby_events ordering.
+  const pop = (r: NearbyEvent) => hashNum(r.event_id);
+  const dayOf = (iso: string) => iso.slice(0, 10);
+  return rows.sort((a, b) => {
+    const d = dayOf(a.starts_at).localeCompare(dayOf(b.starts_at));
+    if (d !== 0) return d;
+    const p = pop(b) - pop(a);
+    if (p !== 0) return p;
+    return a.starts_at.localeCompare(b.starts_at);
+  });
+}
+
+function hashNum(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 97;
+  return h;
 }
 
 // Well-known LA points so the search box works offline in demo mode.

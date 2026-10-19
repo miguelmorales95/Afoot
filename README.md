@@ -82,14 +82,16 @@ Optional, privacy-first social layer:
 
 - **Sign in** with Google/Facebook (Supabase Auth) — enable the providers in the Supabase
   dashboard and add `<site>/auth/callback` as a redirect URL. One tap, no passwords.
-- **RSVP** — "I'm going" on any event; the feed shows a going-count and a **names-only** attendee
-  list (`/api` RPC `occurrence_attendees` — never returns contact info).
-- **Contact exchange** — instead of posting phone numbers in a shared space, you **request** an
-  attendee's contact; they **approve or deny** from their **`/inbox`**; the number is revealed to
-  the requester only on approval (RPC `get_shared_contact`/`outgoing_contact_requests`). Phones
-  live in private `profiles` rows guarded by RLS.
-- **Moderation foundation** — `blocks` and `reports` tables; requests carry a short, reportable
-  note. (A public, moderated group chat is schema-ready and the next increment.)
+- **RSVP, but attendance is private.** "I'm going" never shows a public count or attendee list.
+  The going-count is used **only** server-side (`nearby_events`) to **rank** events, and RSVP is
+  the **key that unlocks the event chat**.
+- **Event chat (gated + moderated)** — only people who RSVP'd can read or post (`messages` RLS +
+  `occurrence_messages` RPC); you only see who else is going **from inside** the chat. Messages
+  support report + block; a light client profanity mask runs on send.
+- **Contact exchange** — inside the chat you can **request** someone's contact; they **approve or
+  deny** from their **`/inbox`**; the number is revealed to the requester only on approval. Phones
+  live in private `profiles` rows guarded by RLS and are never shown in the chat.
+- **Moderation** — `blocks` + `reports` tables; blocked users' messages are hidden for you.
 - **Demo mode** — with no Supabase configured, sign-in/RSVP/requests are simulated in
   `localStorage` so the whole flow is clickable offline.
 

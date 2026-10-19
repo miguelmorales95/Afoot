@@ -31,7 +31,16 @@ export interface NearbyEvent {
   venue_lat: number;
   venue_lng: number;
   distance_km: number;
-  going_count: number;
+  // Attendance (going count) is intentionally NOT exposed to clients — it's
+  // used only server-side for ranking and to gate the event chat.
+}
+
+export interface ChatMessage {
+  id: string;
+  user_id: string;
+  display_name: string;
+  body: string;
+  created_at: string;
 }
 
 export interface Attendee {

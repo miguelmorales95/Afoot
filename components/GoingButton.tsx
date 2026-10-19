@@ -1,35 +1,15 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import Link from "next/link";
 import { useApp } from "./AppProvider";
 import type { NearbyEvent } from "@/lib/types";
 
-export default function GoingButton({
-  ev,
-  onShowAttendees,
-  compact = false,
-}: {
-  ev: NearbyEvent;
-  onShowAttendees?: (ev: NearbyEvent) => void;
-  compact?: boolean;
-}) {
-  const { ready, user, goingSet, toggleGoing } = useApp();
+// RSVP control. Attendance is private — there is NO count shown here. Going is
+// what unlocks the event chat, so once you're in we surface the chat link.
+export default function GoingButton({ ev, compact = false }: { ev: NearbyEvent; compact?: boolean }) {
+  const { goingSet, toggleGoing } = useApp();
   const going = goingSet.has(ev.occurrence_id);
-
-  // Capture whether the user was already counted at load, to display an
-  // accurate optimistic count. Recapture when the signed-in user changes.
-  const initial = useRef<boolean | null>(null);
-  const capturedFor = useRef<string | null>(null);
-  useEffect(() => {
-    if (ready && capturedFor.current !== (user?.id ?? null)) {
-      initial.current = goingSet.has(ev.occurrence_id);
-      capturedFor.current = user?.id ?? null;
-    }
-  }, [ready, user, goingSet, ev.occurrence_id]);
-
-  const base = ev.going_count ?? 0;
-  const init = initial.current ?? false;
-  const count = base + (going === init ? 0 : going ? 1 : -1);
+  const chatHref = `/chat/${ev.occurrence_id}?t=${encodeURIComponent(ev.title)}&v=${encodeURIComponent(ev.venue_name)}`;
 
   return (
     <div className={`flex items-center gap-2 ${compact ? "" : "mt-2"}`}>
@@ -47,17 +27,14 @@ export default function GoingButton({
       >
         {going ? "✓ Going" : "I'm going"}
       </button>
-      {count > 0 && (
-        <button
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onShowAttendees?.(ev);
-          }}
-          className="text-xs text-white/50 underline-offset-2 hover:text-white/80 hover:underline"
+      {going && (
+        <Link
+          href={chatHref}
+          onClick={(e) => e.stopPropagation()}
+          className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/80 hover:bg-white/20"
         >
-          👥 {count} going
-        </button>
+          💬 Chat
+        </Link>
       )}
     </div>
   );

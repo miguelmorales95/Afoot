@@ -14,7 +14,6 @@ import AdRail from "@/components/AdRail";
 import AdUnit from "@/components/AdUnit";
 import EventsTable from "@/components/EventsTable";
 import GoingButton from "@/components/GoingButton";
-import AttendeesModal from "@/components/AttendeesModal";
 
 const EventsMap = dynamic(() => import("@/components/EventsMap"), {
   ssr: false,
@@ -51,7 +50,6 @@ export default function Home() {
   const [view, setView] = useState<View>("list");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [attendeeEv, setAttendeeEv] = useState<NearbyEvent | null>(null);
 
   // Restore last location on mount.
   useEffect(() => {
@@ -245,7 +243,7 @@ export default function Home() {
       {!loading && !loc && !error && <EmptyState hasLocation={false} />}
 
       {!loading && loc && visible.length > 0 && view === "table" && (
-        <EventsTable events={visible} onShowAttendees={setAttendeeEv} />
+        <EventsTable events={visible} />
       )}
 
       {!loading && loc && visible.length > 0 && view === "map" && (
@@ -261,7 +259,7 @@ export default function Home() {
             </h2>
             <div className="mt-2 space-y-3">
               {dayEvents.map((ev) => (
-                <EventCard key={ev.occurrence_id} ev={ev} onShowAttendees={setAttendeeEv} />
+                <EventCard key={ev.occurrence_id} ev={ev} />
               ))}
             </div>
           </div>
@@ -277,19 +275,11 @@ export default function Home() {
 
         <AdRail />
       </div>
-
-      {attendeeEv && <AttendeesModal ev={attendeeEv} onClose={() => setAttendeeEv(null)} />}
     </main>
   );
 }
 
-function EventCard({
-  ev,
-  onShowAttendees,
-}: {
-  ev: NearbyEvent;
-  onShowAttendees: (ev: NearbyEvent) => void;
-}) {
+function EventCard({ ev }: { ev: NearbyEvent }) {
   const cat = categoryMeta(ev.category);
   const body = (
     <div className="group flex gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 transition hover:border-white/20 hover:bg-white/[0.05]">
@@ -327,7 +317,7 @@ function EventCard({
         {ev.is_recurring && ev.recurrence_description && (
           <p className="mt-1 text-xs text-white/30">🔁 {ev.recurrence_description}</p>
         )}
-        <GoingButton ev={ev} onShowAttendees={onShowAttendees} />
+        <GoingButton ev={ev} />
       </div>
     </div>
   );
