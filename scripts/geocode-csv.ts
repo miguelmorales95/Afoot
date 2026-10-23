@@ -2,8 +2,7 @@
 //   npm run geocode:csv                       # uses LOCAL_EVENTS_FILE
 //   npm run geocode:csv -- data/other.csv
 
-import { config } from "dotenv";
-config({ path: ".env.local" });
+import "./env";
 
 import fs from "node:fs";
 import { geocode } from "../lib/geocode";

@@ -2,8 +2,7 @@
 //   npm run ingest                      # all active venues
 //   npm run ingest -- smog-city-torrance  # just one (by slug)
 
-import { config } from "dotenv";
-config({ path: ".env.local" });
+import "./env";
 
 import { ingestAll } from "../lib/ingest";
 

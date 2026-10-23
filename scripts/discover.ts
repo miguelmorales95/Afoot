@@ -8,8 +8,7 @@
 // Tip: set LLM_PROVIDER=ollama in .env.local to classify for free with a local
 // model and leave this running for hours.
 
-import { config } from "dotenv";
-config({ path: ".env.local" });
+import "./env";
 
 import { discover } from "../lib/discover";
 

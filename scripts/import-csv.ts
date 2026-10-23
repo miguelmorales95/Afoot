@@ -5,12 +5,11 @@
 //   npm run import:csv                        # uses LOCAL_EVENTS_FILE
 //   npm run import:csv -- data/other.csv
 
-import { config } from "dotenv";
-config({ path: ".env.local" });
+import "./env";
 
 import fs from "node:fs";
 import { supabase } from "../lib/supabase";
-import { parseCsv, slugify } from "../lib/localEvents";
+import { parseCsv, slugify, uncertainFields } from "../lib/localEvents";
 
 async function main() {
   const args = process.argv.slice(2);
@@ -37,9 +36,9 @@ async function main() {
           lat: r.venue_lat ? Number(r.venue_lat) : null,
           lng: r.venue_lng ? Number(r.venue_lng) : null,
           website: r.url || null,
+          // "manual": researched one-offs; the daily ingest doesn't scrape these venues.
           source: "manual",
-          // Researched one-offs aren't a calendar page the daily ingest should scrape.
-          active: false,
+          active: true,
         },
         { onConflict: "slug" },
       )
@@ -67,6 +66,11 @@ async function main() {
           is_recurring: r.is_recurring === "true",
           tags: r.tags ? r.tags.split(";").map((t) => t.trim()).filter(Boolean) : [],
           source: "manual",
+          source_url: r.source_url || null,
+          confidence: ["high", "medium", "low"].includes(r.confidence) ? r.confidence : "medium",
+          uncertain_fields: uncertainFields(r),
+          notes: r.notes || null,
+          verified_by: r.confidence === "high" ? "source" : null,
           dedupe_key: `${venueId}:${slugify(r.title)}`,
           updated_at: new Date().toISOString(),
         },

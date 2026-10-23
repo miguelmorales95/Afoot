@@ -114,6 +114,25 @@ Optional, privacy-first social layer:
 - **Demo mode** — with no Supabase configured, sign-in/RSVP/requests are simulated in
   `localStorage` so the whole flow is clickable offline.
 
+### Event feedback: flags, tips, and checks
+
+Afoot keeps listings accurate with help from the people using it. No account is needed.
+
+- **Report (⚑)**, modeled on Craigslist flags: wrong time or place, cancelled, scam or spam,
+  not a real event, duplicate, inappropriate. Scam / not real / inappropriate reports from
+  **3 different devices hide the event** until it's reviewed; "cancelled" from **2 devices
+  marks that date cancelled**.
+- **Heads up**, after an event starts: hard to park, too crowded, not as described, not
+  accessible, felt unsafe, great vibe. Shown as tips on the event's series; never removes it.
+- **One-tap checks** on uncertain details ("Does this start at 8pm?"). Events carry a
+  `confidence` and `uncertain_fields`; **2 "yes" answers** from different devices confirm a
+  detail, and 2 "no" answers send it to `/admin`.
+
+Each browser keeps a random id in localStorage; the server stores only a salted hash
+(`DEVICE_HASH_SALT`), never an IP. Each device can send 30 pieces of feedback a day. Flagged
+events appear at the top of `/admin` with **Looks fine**, **Hide event**, and **Restore**.
+Thresholds live in `app/api/feedback/route.ts`.
+
 ### Admin review (`/admin`)
 
 A single screen to triage what to add. It merges community **submissions** and crawler-discovered
@@ -147,8 +166,10 @@ npm install
 ### 2. Supabase
 
 1. Create a free project at [supabase.com](https://supabase.com).
-2. In the SQL editor, run **`supabase/schema.sql`** then **`supabase/seed.sql`**.
-3. Grab **Settings → API**: the project URL and the **service role** key.
+2. In the SQL editor, run **`supabase/schema.sql`** then **`supabase/seed.sql`**. Everything
+   is created in an **`afoot` schema** so Afoot can share a Supabase project with other apps.
+3. In **Project Settings → Data API → Exposed schemas**, add `afoot`.
+4. Grab **Settings → API Keys**: the project URL, the publishable key, and the secret key.
 
 ### 3. Environment
 

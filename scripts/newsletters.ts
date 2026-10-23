@@ -7,8 +7,7 @@
 // No domain or webhook needed — just an inbox (Gmail with an app password,
 // Fastmail, etc.). Set IMAP_* in .env.local. Processed mail is marked read.
 
-import { config } from "dotenv";
-config({ path: ".env.local" });
+import "./env";
 
 import { ImapFlow } from "imapflow";
 import { simpleParser } from "mailparser";

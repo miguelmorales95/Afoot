@@ -1,3 +1,6 @@
+-- Runs in the afoot schema (see schema.sql).
+set search_path = afoot, public;
+
 -- Seed venues. Run after schema.sql.
 -- lat/lng are filled in for the two we're confident about so the app works
 -- immediately. Any venue with a NULL lat/lng gets geocoded from `address`

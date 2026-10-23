@@ -39,5 +39,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "query failed" }, { status: 500 });
   }
 
-  return NextResponse.json({ events: data ?? [] });
+  // `feedback`: events come from the database, so flags and checks can be saved.
+  return NextResponse.json({ events: data ?? [], feedback: true });
 }

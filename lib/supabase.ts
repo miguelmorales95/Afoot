@@ -1,4 +1,7 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient as BaseClient } from "@supabase/supabase-js";
+
+// Untyped client bound to the `afoot` schema.
+type SupabaseClient = BaseClient<any, any, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 // Server-only Supabase client using the service role key.
 // NEVER import this into a client component — the service role key bypasses
@@ -23,7 +26,8 @@ export function getSupabase(): SupabaseClient {
           "SUPABASE_SERVICE_ROLE_KEY (see .env.example), or run in DEMO_MODE.",
       );
     }
-    _client = createClient(url, serviceKey, { auth: { persistSession: false } });
+    // Afoot's tables live in their own schema; other apps share this Supabase project.
+    _client = createClient(url, serviceKey, { auth: { persistSession: false }, db: { schema: "afoot" } });
   }
   return _client;
 }

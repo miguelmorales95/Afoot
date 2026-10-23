@@ -155,7 +155,9 @@ export async function ingestAll(
 ): Promise<VenueResult[]> {
   const log = opts.log ?? console.log;
 
-  let query = supabase.from("venues").select("*").eq("active", true);
+  // "manual" venues hold hand-researched one-off events (npm run import:csv), not a
+  // calendar page worth scraping every day.
+  let query = supabase.from("venues").select("*").eq("active", true).neq("source", "manual");
   if (opts.onlySlug) query = query.eq("slug", opts.onlySlug);
 
   const { data: venues, error } = await query;

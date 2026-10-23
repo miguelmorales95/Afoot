@@ -12,7 +12,22 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import type { EventCategory, NearbyEvent } from "./types";
+import type { EventCategory, NearbyEvent, UncertainField } from "./types";
+
+/**
+ * Which details of a researched row still need confirming, read from its confidence
+ * and notes ("start time conflicts", "no year on the page", "ZIP added by hand").
+ */
+export function uncertainFields(r: CsvRow): UncertainField[] {
+  if (r.confidence === "high") return [];
+  const notes = (r.notes || "").toLowerCase();
+  const fields = new Set<UncertainField>();
+  if (/time|start|hour|doors|8am|10am/.test(notes)) fields.add("starts_at");
+  if (/address|zip|location|plaza|pin|street/.test(notes)) fields.add("address");
+  if (/price|cost|ticket/.test(notes)) fields.add("price");
+  if (/year|date|recurr|weekly|monthly|last friday|undated/.test(notes) || fields.size === 0) fields.add("date");
+  return [...fields];
+}
 
 export type CsvRow = Record<string, string>;
 
@@ -121,6 +136,10 @@ export function localNearby(lat: number, lng: number, radiusKm: number, daysAhea
       venue_lat: vLat,
       venue_lng: vLng,
       distance_km: Math.round(distance * 100) / 100,
+      confidence: (["high", "medium", "low"].includes(r.confidence) ? r.confidence : "high") as NearbyEvent["confidence"],
+      uncertain_fields: uncertainFields(r),
+      cancelled: false,
+      heads_up: {},
     });
   }
 

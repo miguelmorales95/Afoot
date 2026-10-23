@@ -1,6 +1,12 @@
 -- Afoot schema. Run this in the Supabase SQL editor (or `supabase db push`).
+-- Everything lives in its own `afoot` schema so it never collides with other apps
+-- sharing this Supabase project (NoBucks' Prisma tables live in `public`).
+-- After the first run, add `afoot` to Project Settings -> Data API -> Exposed schemas.
 -- Design: a venue has many events (series); each event has many concrete
 -- occurrences (expanded dates). The feed queries occurrences near a point.
+
+create schema if not exists afoot;
+set search_path = afoot, public, extensions;
 
 -- ---------------------------------------------------------------------------
 -- Tables
@@ -53,6 +59,52 @@ create table if not exists event_occurrences (
   ends_at    timestamptz,
   created_at timestamptz default now(),
   unique (event_id, starts_at)
+);
+
+-- How sure we are about each event, and where that came from. Uncertain fields are
+-- shown to users ("Time unconfirmed") and asked about as one-tap checks.
+alter table events add column if not exists confidence text default 'high'
+  check (confidence in ('high', 'medium', 'low'));
+alter table events add column if not exists uncertain_fields text[] default '{}'; -- starts_at | date | address | price
+alter table events add column if not exists source_url text;
+alter table events add column if not exists notes text;             -- what's uncertain and why
+alter table events add column if not exists status text default 'active'
+  check (status in ('active', 'hidden'));                          -- hidden: removed after reports
+alter table events add column if not exists verified_at timestamptz;
+alter table events add column if not exists verified_by text;      -- venue | source | community | ai | admin
+alter table event_occurrences add column if not exists cancelled boolean default false;
+
+-- People's feedback on events, keyed by a hashed random device id (no login, no IP).
+--   kind 'report':   wrong_info | cancelled | scam | not_real | duplicate | inappropriate
+--   kind 'heads_up': parking | crowded | not_as_described | not_accessible | unsafe | great_vibe
+create table if not exists event_flags (
+  id            uuid primary key default gen_random_uuid(),
+  event_id      uuid not null references events(id) on delete cascade,
+  occurrence_id uuid references event_occurrences(id) on delete set null,
+  kind          text not null check (kind in ('report', 'heads_up')),
+  reason        text not null,
+  note          text check (char_length(note) <= 500),
+  device_hash   text not null,
+  user_id       uuid references auth.users(id) on delete set null,
+  status        text default 'open' check (status in ('open', 'actioned', 'dismissed')),
+  created_at    timestamptz default now()
+);
+-- One flag per device per reason per event (or per date, for date-specific reports).
+create unique index if not exists idx_flags_once
+  on event_flags(event_id, coalesce(occurrence_id, '00000000-0000-0000-0000-000000000000'::uuid), kind, reason, device_hash);
+create index if not exists idx_flags_open on event_flags(status, created_at desc);
+
+-- One-tap answers to "Is this at 8pm?" style questions about uncertain fields.
+create table if not exists event_checks (
+  id            uuid primary key default gen_random_uuid(),
+  event_id      uuid not null references events(id) on delete cascade,
+  occurrence_id uuid references event_occurrences(id) on delete set null,
+  field         text not null,                      -- starts_at | date | address | price
+  answer        text not null check (answer in ('yes', 'no', 'unsure')),
+  device_hash   text not null,
+  user_id       uuid references auth.users(id) on delete set null,
+  created_at    timestamptz default now(),
+  unique (event_id, field, device_hash)
 );
 
 create table if not exists submissions (
@@ -147,10 +199,10 @@ create table if not exists profiles (
 create or replace function handle_new_user()
 returns trigger
 language plpgsql
-security definer set search_path = public
+security definer set search_path = afoot
 as $$
 begin
-  insert into public.profiles (id, display_name, avatar_url)
+  insert into afoot.profiles (id, display_name, avatar_url)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
@@ -161,10 +213,11 @@ begin
 end;
 $$;
 
-drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
+-- Named for Afoot: other apps on this project may add their own sign-up triggers.
+drop trigger if exists afoot_on_auth_user_created on auth.users;
+create trigger afoot_on_auth_user_created
   after insert on auth.users
-  for each row execute function handle_new_user();
+  for each row execute function afoot.handle_new_user();
 
 -- "I'm going" to a specific occurrence.
 create table if not exists rsvps (
@@ -218,6 +271,8 @@ create table if not exists reports (
 -- is required (keeps the free tier dead simple).
 -- ---------------------------------------------------------------------------
 
+-- Return type changed over time (confidence, heads-up tips); drop before recreating.
+drop function if exists nearby_events(double precision, double precision, double precision, int);
 create or replace function nearby_events(
   in_lat        double precision,
   in_lng        double precision,
@@ -242,10 +297,15 @@ returns table (
   venue_address          text,
   venue_lat              double precision,
   venue_lng              double precision,
-  distance_km            double precision
+  distance_km            double precision,
+  confidence             text,
+  uncertain_fields       text[],
+  cancelled              boolean,
+  heads_up               jsonb      -- {"parking": 3, "great_vibe": 5}, from people who went
 )
 language sql
 stable
+set search_path = afoot
 as $$
   with scored as (
     select
@@ -263,25 +323,36 @@ as $$
           sin(radians(in_lat)) * sin(radians(v.lat))
         ))
       )) as distance_km,
-      coalesce(r.c, 0) as going_count
+      coalesce(r.c, 0) as going_count,
+      e.confidence, e.uncertain_fields, o.cancelled,
+      coalesce(h.tips, '{}'::jsonb) as heads_up
     from event_occurrences o
     join events e on e.id = o.event_id
     join venues v on v.id = e.venue_id
     left join (
       select occurrence_id, count(*)::bigint as c from rsvps group by occurrence_id
     ) r on r.occurrence_id = o.id
+    -- Heads-up tips apply to the whole series (parking doesn't change week to week).
+    left join (
+      select event_id, jsonb_object_agg(reason, n) as tips
+      from (
+        select event_id, reason, count(distinct device_hash) as n
+        from event_flags where kind = 'heads_up' and status <> 'dismissed'
+        group by event_id, reason
+      ) t group by event_id
+    ) h on h.event_id = e.id
     where v.active
+      and e.status = 'active'
       and v.lat is not null
       and v.lng is not null
-      and o.starts_at >= now()
+      and coalesce(o.ends_at, o.starts_at + interval '3 hours') >= now()
       and o.starts_at <= now() + make_interval(days => in_days_ahead)
   )
-  -- going_count is intentionally NOT returned (attendance is private). It is
-  -- used only to rank events: more-popular events surface higher within a day.
   select
     occurrence_id, event_id, title, description, category, price, url,
     recurrence_description, is_recurring, tags, starts_at, ends_at,
-    venue_id, venue_name, venue_address, venue_lat, venue_lng, distance_km
+    venue_id, venue_name, venue_address, venue_lat, venue_lng, distance_km,
+    confidence, uncertain_fields, cancelled, heads_up
   from scored
   where distance_km <= in_radius_km
   order by (starts_at at time zone 'America/Los_Angeles')::date asc,
@@ -298,7 +369,7 @@ $$;
 -- you only see who's going if YOU are also going (i.e. you're in the chat).
 create or replace function occurrence_attendees(in_occurrence_id uuid)
 returns table (user_id uuid, display_name text, avatar_url text)
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = afoot as $$
   select p.id, coalesce(p.display_name, 'Guest'), p.avatar_url
   from rsvps rs
   join profiles p on p.id = rs.user_id
@@ -324,7 +395,7 @@ create index if not exists idx_messages_occ on messages(occurrence_id, created_a
 -- anyone the caller has blocked. (SECURITY DEFINER but filtered by auth.uid().)
 create or replace function occurrence_messages(in_occurrence_id uuid)
 returns table (id uuid, user_id uuid, display_name text, body text, created_at timestamptz)
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = afoot as $$
   select m.id, m.user_id, coalesce(p.display_name, 'Guest'), m.body, m.created_at
   from messages m
   join profiles p on p.id = m.user_id
@@ -342,7 +413,7 @@ $$;
 -- Contact requests addressed to me (with requester name), hiding blocked users.
 create or replace function incoming_contact_requests()
 returns table (id uuid, requester_id uuid, requester_name text, occurrence_id uuid, message text, status text, created_at timestamptz)
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = afoot as $$
   select cr.id, cr.requester_id, coalesce(p.display_name, 'Someone'),
          cr.occurrence_id, cr.message, cr.status, cr.created_at
   from contact_requests cr
@@ -355,7 +426,7 @@ $$;
 -- My outgoing requests; phone is included only when approved and shared.
 create or replace function outgoing_contact_requests()
 returns table (id uuid, recipient_id uuid, recipient_name text, occurrence_id uuid, status text, shared_phone text, created_at timestamptz)
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = afoot as $$
   select cr.id, cr.recipient_id, coalesce(p.display_name, 'Someone'),
          cr.occurrence_id, cr.status,
          case when cr.status = 'approved' and p.share_phone then p.phone else null end,
@@ -438,3 +509,29 @@ create policy "messages insert if going" on messages for insert with check (
   user_id = auth.uid()
   and exists (select 1 from rsvps r where r.occurrence_id = messages.occurrence_id and r.user_id = auth.uid())
 );
+
+-- Feedback is written and read only by the server (service role), which hashes device
+-- ids and rate-limits; no direct browser access.
+alter table event_flags  enable row level security;
+alter table event_checks enable row level security;
+
+-- ---------------------------------------------------------------------------
+-- Access for Supabase's API roles. A custom schema gets none of the defaults that
+-- `public` has, so grant explicitly. RLS above still decides which rows each role sees.
+-- ---------------------------------------------------------------------------
+grant usage on schema afoot to anon, authenticated, service_role;
+grant all on all tables    in schema afoot to service_role;
+grant all on all sequences in schema afoot to service_role;
+grant all on all functions in schema afoot to service_role;
+grant select on venues, events, event_occurrences to anon, authenticated;
+grant select, insert, update on profiles to authenticated;
+grant select, insert, delete on rsvps to authenticated;
+grant select, insert, update on contact_requests to authenticated;
+grant select, insert, delete on blocks to authenticated;
+grant insert on reports to authenticated;
+grant select, insert on messages to authenticated;
+grant execute on function nearby_events(double precision, double precision, double precision, int) to anon, authenticated;
+grant execute on function occurrence_attendees(uuid), occurrence_messages(uuid),
+  incoming_contact_requests(), outgoing_contact_requests() to authenticated;
+alter default privileges in schema afoot grant all on tables to service_role;
+alter default privileges in schema afoot grant all on functions to service_role;

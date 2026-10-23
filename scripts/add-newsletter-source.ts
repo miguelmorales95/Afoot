@@ -10,8 +10,7 @@
 //   npm run newsletter:add -- smog-city-torrance news@smogcitybrewing.com
 //   npm run newsletter:add -- zebulon-la substack.com "Zebulon"
 
-import { config } from "dotenv";
-config({ path: ".env.local" });
+import "./env";
 
 import { supabase } from "../lib/supabase";
 

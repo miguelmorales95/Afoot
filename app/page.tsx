@@ -14,6 +14,7 @@ import AdRail from "@/components/AdRail";
 import AdUnit from "@/components/AdUnit";
 import EventsTable from "@/components/EventsTable";
 import GoingButton from "@/components/GoingButton";
+import EventFeedback, { UnconfirmedBadges } from "@/components/EventFeedback";
 
 const EventsMap = dynamic(() => import("@/components/EventsMap"), {
   ssr: false,
@@ -45,6 +46,7 @@ const FILTERS: { key: string; label: string }[] = [
 export default function Home() {
   const [loc, setLoc] = useState<Loc | null>(null);
   const [events, setEvents] = useState<NearbyEvent[]>([]);
+  const [feedback, setFeedback] = useState(false); // flags/checks need the database
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
   const [view, setView] = useState<View>("list");
@@ -83,6 +85,7 @@ export default function Home() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load events");
       setEvents(data.events as NearbyEvent[]);
+      setFeedback(Boolean(data.feedback));
     } catch (e) {
       setError((e as Error).message);
       setEvents([]);
@@ -259,7 +262,7 @@ export default function Home() {
             </h2>
             <div className="mt-2 space-y-3">
               {dayEvents.map((ev) => (
-                <EventCard key={ev.occurrence_id} ev={ev} />
+                <EventCard key={ev.occurrence_id} ev={ev} feedback={feedback} />
               ))}
             </div>
           </div>
@@ -279,7 +282,7 @@ export default function Home() {
   );
 }
 
-function EventCard({ ev }: { ev: NearbyEvent }) {
+function EventCard({ ev, feedback }: { ev: NearbyEvent; feedback: boolean }) {
   const cat = categoryMeta(ev.category);
   const body = (
     <div className="group flex gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 transition hover:border-white/20 hover:bg-white/[0.05]">
@@ -289,7 +292,7 @@ function EventCard({ ev }: { ev: NearbyEvent }) {
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-3">
-          <h3 className="font-semibold leading-snug text-white group-hover:text-fuchsia-300">
+          <h3 className={`font-semibold leading-snug text-white group-hover:text-fuchsia-300 ${ev.cancelled ? "line-through opacity-60" : ""}`}>
             {ev.title}
           </h3>
           <span
@@ -302,6 +305,9 @@ function EventCard({ ev }: { ev: NearbyEvent }) {
           {ev.venue_name} · {formatDistance(ev.distance_km)} away
           {ev.price ? ` · ${ev.price}` : ""}
         </p>
+        {(ev.cancelled || !!ev.uncertain_fields?.length) && (
+          <div className="mt-1.5 flex flex-wrap gap-1"><UnconfirmedBadges ev={ev} /></div>
+        )}
         {ev.description && (
           <p className="mt-1 line-clamp-2 text-sm text-white/40">{ev.description}</p>
         )}
@@ -318,6 +324,7 @@ function EventCard({ ev }: { ev: NearbyEvent }) {
           <p className="mt-1 text-xs text-white/30">🔁 {ev.recurrence_description}</p>
         )}
         <GoingButton ev={ev} />
+        <EventFeedback ev={ev} enabled={feedback} />
       </div>
     </div>
   );

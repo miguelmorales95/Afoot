@@ -7,8 +7,7 @@
 // Review candidates first in Supabase (or approve via SQL):
 //   update candidate_venues set status='approved' where domain='...';
 
-import { config } from "dotenv";
-config({ path: ".env.local" });
+import "./env";
 
 import { supabase } from "../lib/supabase";
 

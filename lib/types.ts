@@ -33,7 +33,35 @@ export interface NearbyEvent {
   distance_km: number;
   // Attendance (going count) is intentionally NOT exposed to clients — it's
   // used only server-side for ranking and to gate the event chat.
+  /** How sure we are, and which details still need confirming ("Time unconfirmed"). */
+  confidence?: "high" | "medium" | "low";
+  uncertain_fields?: UncertainField[];
+  cancelled?: boolean;
+  /** Tips from people who went, counted per device: { parking: 3, great_vibe: 5 }. */
+  heads_up?: Partial<Record<HeadsUpReason, number>>;
 }
+
+export type UncertainField = "starts_at" | "date" | "address" | "price";
+
+export const REPORT_REASONS = {
+  wrong_info: "Wrong time or place",
+  cancelled: "Cancelled / not happening",
+  scam: "Scam or spam",
+  not_real: "Not a real event",
+  duplicate: "Duplicate listing",
+  inappropriate: "Inappropriate",
+} as const;
+export type ReportReason = keyof typeof REPORT_REASONS;
+
+export const HEADS_UP_REASONS = {
+  great_vibe: "Great vibe",
+  parking: "Hard to park",
+  crowded: "Too crowded",
+  not_as_described: "Not as described",
+  not_accessible: "Not accessible",
+  unsafe: "Felt unsafe",
+} as const;
+export type HeadsUpReason = keyof typeof HEADS_UP_REASONS;
 
 export interface ChatMessage {
   id: string;
@@ -122,4 +150,20 @@ export interface Venue {
   active: boolean;
   render: boolean;
   last_ingested_at: string | null;
+}
+
+/** An event in the /admin flag queue. */
+export interface FlaggedEvent {
+  event_id: string;
+  title: string;
+  venue: string | null;
+  status: string;
+  confidence: string | null;
+  uncertain_fields: string[];
+  research_notes: string | null;
+  url: string | null;
+  source_url: string | null;
+  reasons: Record<string, number>; // "report:scam" -> distinct devices
+  notes: string[];
+  last_at: string;
 }

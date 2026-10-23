@@ -1,8 +1,7 @@
 // Fill in lat/lng for any venue that has an address but no coordinates.
 // Run:  npm run geocode
 
-import { config } from "dotenv";
-config({ path: ".env.local" });
+import "./env";
 
 import { supabase } from "../lib/supabase";
 import { geocode } from "../lib/geocode";
