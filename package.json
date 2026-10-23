@@ -15,7 +15,8 @@
     "newsletters": "tsx scripts/newsletters.ts",
     "newsletter:add": "tsx scripts/add-newsletter-source.ts",
     "geocode:csv": "tsx scripts/geocode-csv.ts",
-    "import:csv": "tsx scripts/import-csv.ts"
+    "import:csv": "tsx scripts/import-csv.ts",
+    "recheck": "tsx scripts/recheck.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.65.0",

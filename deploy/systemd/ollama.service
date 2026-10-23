@@ -1,0 +1,12 @@
+# Local AI model server used by `npm run recheck` (LLM_PROVIDER=ollama). User service, no sudo.
+[Unit]
+Description=Ollama local model server (Vulkan GPU)
+
+[Service]
+ExecStart=%h/.local/ollama/bin/ollama serve
+Environment=OLLAMA_VULKAN=1
+Environment=OLLAMA_HOST=127.0.0.1:11434
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

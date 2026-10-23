@@ -15,6 +15,7 @@ import AdUnit from "@/components/AdUnit";
 import EventsTable from "@/components/EventsTable";
 import GoingButton from "@/components/GoingButton";
 import EventFeedback, { UnconfirmedBadges } from "@/components/EventFeedback";
+import { LAUNCH_AREAS, type LaunchArea } from "@/lib/areas";
 
 const EventsMap = dynamic(() => import("@/components/EventsMap"), {
   ssr: false,
@@ -112,6 +113,13 @@ export default function Home() {
     }
   };
 
+  const pickArea = (a: LaunchArea) => {
+    const l: Loc = { lat: a.lat, lng: a.lng, label: a.name };
+    setQuery("");
+    persist(l);
+    void loadEvents(l);
+  };
+
   const useMyLocation = () => {
     if (!navigator.geolocation) {
       setError("Geolocation isn't available in this browser.");
@@ -187,6 +195,20 @@ export default function Home() {
           >
             or use my current location
           </button>
+          <div className="mx-auto mt-4 flex max-w-2xl flex-wrap justify-center gap-1.5" aria-label="Neighborhoods">
+            {LAUNCH_AREAS.map((a) => (
+              <button
+                key={a.name}
+                type="button"
+                onClick={() => pickArea(a)}
+                className={`rounded-full px-3 py-1 text-xs transition ${
+                  loc?.label === a.name ? "bg-fuchsia-600 text-white" : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                {a.name}
+              </button>
+            ))}
+          </div>
         </div>
       </section>
 

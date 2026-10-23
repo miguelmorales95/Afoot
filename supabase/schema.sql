@@ -73,6 +73,9 @@ alter table events add column if not exists status text default 'active'
 alter table events add column if not exists verified_at timestamptz;
 alter table events add column if not exists verified_by text;      -- venue | source | community | ai | admin
 alter table event_occurrences add column if not exists cancelled boolean default false;
+-- AI clean-up job (npm run recheck): when an event's source page was last re-read, and the outcome.
+alter table events add column if not exists rechecked_at timestamptz;
+alter table events add column if not exists recheck_note text;
 
 -- People's feedback on events, keyed by a hashed random device id (no login, no IP).
 --   kind 'report':   wrong_info | cancelled | scam | not_real | duplicate | inappropriate

@@ -1,0 +1,11 @@
+# One run of Afoot's AI clean-up job (scripts/recheck.ts). Started by afoot-recheck.timer.
+[Unit]
+Description=Afoot AI clean-up of uncertain events
+Wants=ollama.service
+After=ollama.service network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/Afoot
+Environment=PATH=%h/.local/node/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=%h/.local/node/bin/npm run --silent recheck
