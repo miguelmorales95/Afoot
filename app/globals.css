@@ -22,3 +22,8 @@ body {
     radial-gradient(60% 50% at 50% 0%, rgba(168, 85, 247, 0.18), transparent 70%),
     radial-gradient(40% 40% at 80% 10%, rgba(236, 72, 153, 0.12), transparent 70%);
 }
+
+/* Ad slots: show the house promo until AdSense fills the slot, and again if it can't. */
+.ad-slot .ad-fallback { display: block; }
+.ad-slot ins.adsbygoogle[data-ad-status="filled"] + .ad-fallback { display: none; }
+.ad-slot ins.adsbygoogle[data-ad-status="unfilled"] { display: none !important; }

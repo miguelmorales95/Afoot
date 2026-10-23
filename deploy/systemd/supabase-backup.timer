@@ -1,0 +1,10 @@
+# Weekly, Sunday 3am; Persistent catches up if the computer was off.
+[Unit]
+Description=Weekly Supabase backup
+
+[Timer]
+OnCalendar=Sun *-*-* 03:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

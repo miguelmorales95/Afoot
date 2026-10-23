@@ -48,37 +48,51 @@ async function main() {
     venueIds.set(slug, data.id);
   }
 
-  let written = 0;
+  // Events already in the database keep their verification state (confidence, uncertain
+  // fields, verified_by): people, the AI clean-up and /admin may have confirmed details
+  // since the CSV was written. Only descriptive fields are refreshed for them.
+  const { data: existing, error: exErr } = await supabase.from("events").select("id, dedupe_key");
+  if (exErr) throw exErr;
+  const existingIds = new Map((existing || []).map((e) => [e.dedupe_key as string, e.id as string]));
+
+  let written = 0, added = 0;
   for (const r of rows) {
     const venueId = venueIds.get(slugify(r.venue_name));
     if (!venueId) continue;
-    const { data: ev, error: evErr } = await supabase
-      .from("events")
-      .upsert(
-        {
-          venue_id: venueId,
-          title: r.title,
-          description: r.description || null,
-          category: r.category || "other",
-          price: r.price || null,
-          url: r.url || r.source_url || null,
-          recurrence_description: r.recurrence_description || null,
-          is_recurring: r.is_recurring === "true",
-          tags: r.tags ? r.tags.split(";").map((t) => t.trim()).filter(Boolean) : [],
-          source: "manual",
-          source_url: r.source_url || null,
-          confidence: ["high", "medium", "low"].includes(r.confidence) ? r.confidence : "medium",
-          uncertain_fields: uncertainFields(r),
-          notes: r.notes || null,
-          verified_by: r.confidence === "high" ? "source" : null,
-          dedupe_key: `${venueId}:${slugify(r.title)}`,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "dedupe_key" },
-      )
-      .select("id")
-      .single();
-    if (evErr || !ev) { console.log(`  ! event ${r.title}: ${evErr?.message}`); continue; }
+    const dedupe_key = `${venueId}:${slugify(r.title)}`;
+    const descriptive = {
+      venue_id: venueId,
+      title: r.title,
+      description: r.description || null,
+      category: r.category || "other",
+      price: r.price || null,
+      url: r.url || r.source_url || null,
+      recurrence_description: r.recurrence_description || null,
+      is_recurring: r.is_recurring === "true",
+      tags: r.tags ? r.tags.split(";").map((t) => t.trim()).filter(Boolean) : [],
+      source_url: r.source_url || null,
+      updated_at: new Date().toISOString(),
+    };
+    let eventId = existingIds.get(dedupe_key);
+    if (eventId) {
+      const { error } = await supabase.from("events").update(descriptive).eq("id", eventId);
+      if (error) { console.log(`  ! event ${r.title}: ${error.message}`); continue; }
+    } else {
+      const { data: ev, error } = await supabase.from("events").insert({
+        ...descriptive,
+        source: "manual",
+        dedupe_key,
+        confidence: ["high", "medium", "low"].includes(r.confidence) ? r.confidence : "medium",
+        uncertain_fields: uncertainFields(r),
+        notes: r.notes || null,
+        verified_by: r.confidence === "high" ? "source" : null,
+      }).select("id").single();
+      if (error || !ev) { console.log(`  ! event ${r.title}: ${error?.message}`); continue; }
+      eventId = ev.id as string;
+      existingIds.set(dedupe_key, eventId);
+      added++;
+    }
+    const ev = { id: eventId };
 
     const { error: occErr } = await supabase
       .from("event_occurrences")
@@ -86,7 +100,7 @@ async function main() {
     if (occErr) console.log(`  ! occurrence ${r.title} ${r.starts_at}: ${occErr.message}`);
     else written++;
   }
-  console.log(`Done. ${written} occurrence(s) written.`);
+  console.log(`Done. ${written} occurrence(s) written; ${added} new event(s), the rest refreshed.`);
 }
 
 main().then(() => process.exit(0));

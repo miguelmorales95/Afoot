@@ -34,8 +34,24 @@ export interface HouseAd {
   badge?: string;
 }
 
-// House ads — shown with the "house" provider, or as a fallback when a network
-// provider isn't configured. The first one sells the space itself.
+// Paid local sponsors, sold directly (a brewery, a venue, a business district). Each
+// slot shows a sponsor first, then the ad network (if configured), then the house
+// promos below, so a slot is never empty. Add one per signed sponsor:
+//   { title: "Smog City Brewing", body: "Trivia Tuesdays in Torrance", href: "https://…", cta: "See what's on →", badge: "🍺" },
+export const SPONSORS: HouseAd[] = [];
+
+// Google AdSense defaults to non-personalized ads (no profile-based targeting) to stay
+// close to Afoot's privacy promise. Set NEXT_PUBLIC_ADSENSE_PERSONALIZED=1 to allow
+// personalized ads (higher pay; needs a consent banner and a "Do Not Sell or Share" link).
+export const ADSENSE_PERSONALIZED = process.env.NEXT_PUBLIC_ADSENSE_PERSONALIZED === "1";
+
+/** True when nothing on the page uses an ad network (house ads and sponsors only). */
+export function trackingFree(): boolean {
+  const p = adProvider();
+  return p === "house" || p === "none" || (p === "adsense" && !ADSENSE_CLIENT) || (p === "ethicalads");
+}
+
+// House promos: the last fallback for any slot. The first one sells the space itself.
 export function advertiseMailto(): string {
   const subject = encodeURIComponent("Advertise on Afoot");
   return `mailto:${SUGGEST_EMAIL}?subject=${subject}`;

@@ -1,5 +1,5 @@
 import AdUnit from "./AdUnit";
-import { adProvider } from "@/lib/ads";
+import { adProvider, trackingFree } from "@/lib/ads";
 
 // Right-side ad rail (desktop only — keeps small/old phones light).
 export default function AdRail() {
@@ -10,7 +10,7 @@ export default function AdRail() {
         <AdUnit index={0} className="min-h-[200px]" slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_RAIL} />
         <AdUnit index={1} className="min-h-[200px]" />
         <p className="px-1 text-[10px] leading-relaxed text-white/20">
-          Ads keep Afoot free. No cookies, no tracking.
+          {trackingFree() ? "Ads keep Afoot free. No cookies, no tracking." : "Ads keep Afoot free. Local sponsors first; no personalized ads."}
         </p>
       </div>
     </aside>

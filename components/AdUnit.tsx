@@ -5,14 +5,17 @@ import Link from "next/link";
 import {
   adProvider,
   ADSENSE_CLIENT,
+  ADSENSE_PERSONALIZED,
   ETHICALADS_PUBLISHER,
   HOUSE_ADS,
+  SPONSORS,
+  type HouseAd,
 } from "@/lib/ads";
 
 declare global {
   interface Window {
     ethicalads?: { load?: () => void; wait?: Promise<unknown> };
-    adsbygoogle?: unknown[];
+    adsbygoogle?: unknown[] & { requestNonPersonalizedAds?: number };
   }
 }
 
@@ -27,8 +30,10 @@ function loadScriptOnce(id: string, src: string, attrs: Record<string, string> =
 }
 
 /**
- * A single ad placement. Cookieless by default.
- * `index` rotates which house ad shows; `slot` is the AdSense slot id.
+ * A single ad placement, filled in order so it's never empty:
+ *   1. a paid local sponsor (SPONSORS), 2. the ad network, if configured,
+ *   3. a house promo (also shown when AdSense has no ad for the slot).
+ * `index` picks which sponsor / promo; `slot` is the AdSense slot id.
  */
 export default function AdUnit({
   index = 0,
@@ -40,8 +45,13 @@ export default function AdUnit({
   className?: string;
 }) {
   const provider = adProvider();
+  const sponsor = SPONSORS.length > index ? SPONSORS[index] : null;
+  const network = !sponsor && (
+    (provider === "ethicalads" && !!ETHICALADS_PUBLISHER) || (provider === "adsense" && !!ADSENSE_CLIENT && !!slot)
+  );
 
   useEffect(() => {
+    if (!network) return;
     if (provider === "ethicalads" && ETHICALADS_PUBLISHER) {
       loadScriptOnce(
         "ethicalads-script",
@@ -58,17 +68,20 @@ export default function AdUnit({
         { crossorigin: "anonymous" },
       );
       try {
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
+        const q = (window.adsbygoogle = window.adsbygoogle || []);
+        if (!ADSENSE_PERSONALIZED) q.requestNonPersonalizedAds = 1;
+        q.push({});
       } catch {
         /* ignore */
       }
     }
-  }, [provider]);
+  }, [provider, network]);
 
   if (provider === "none") return null;
+  if (sponsor) return <HouseCard ad={sponsor} label="Sponsor" className={className} />;
 
   // --- EthicalAds (contextual, cookieless) ---
-  if (provider === "ethicalads" && ETHICALADS_PUBLISHER) {
+  if (network && provider === "ethicalads") {
     return (
       <div
         className={className}
@@ -81,10 +94,11 @@ export default function AdUnit({
     );
   }
 
-  // --- Google AdSense (note: tracks users) ---
-  if (provider === "adsense" && ADSENSE_CLIENT && slot) {
+  // --- Google AdSense: if Google has no ad, it marks the slot "unfilled" and the house
+  // promo underneath shows instead (see globals.css). ---
+  if (network && provider === "adsense") {
     return (
-      <div className={className} aria-label="Advertisement" role="complementary">
+      <div className={`ad-slot ${className}`} aria-label="Advertisement" role="complementary">
         <ins
           className="adsbygoogle"
           style={{ display: "block" }}
@@ -93,17 +107,21 @@ export default function AdUnit({
           data-ad-format="auto"
           data-full-width-responsive="true"
         />
+        <HouseCard ad={HOUSE_ADS[index % HOUSE_ADS.length]} className="ad-fallback h-full" />
       </div>
     );
   }
 
-  // --- House ad (default; zero external calls, zero tracking) ---
-  const ad = HOUSE_ADS[index % HOUSE_ADS.length];
+  // --- House promo (zero external calls, zero tracking) ---
+  return <HouseCard ad={HOUSE_ADS[index % HOUSE_ADS.length]} className={className} />;
+}
+
+function HouseCard({ ad, className = "", label = "Sponsor" }: { ad: HouseAd; className?: string; label?: string }) {
   const inner = (
     <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.03] p-4">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-lg">{ad.badge ?? "✨"}</span>
-        <span className="text-[10px] uppercase tracking-widest text-white/25">Sponsor</span>
+        <span className="text-[10px] uppercase tracking-widest text-white/25">{label}</span>
       </div>
       <h3 className="text-sm font-semibold text-white">{ad.title}</h3>
       <p className="mt-1 flex-1 text-xs text-white/50">{ad.body}</p>

@@ -69,6 +69,27 @@ function quoteBacksUp(field: Field, quote: string | undefined, page: string, ev:
   return false;
 }
 
+/**
+ * Whether a value the model says is "different" actually contradicts our listing. Small
+ * models report "Tomorrow" or "Fri, Oct 30" as different from Oct 30; only flag a real
+ * mismatch (another day of the month, another hour).
+ */
+export function contradicts(field: Field, value: string | undefined, startsAt: string): boolean {
+  const v = (value || "").toLowerCase();
+  if (!v.trim()) return false;
+  const p = localParts(startsAt);
+  if (field === "date") {
+    if (/today|tomorrow|tonight|this (week|weekend)/.test(v)) return false;
+    const days = [...v.matchAll(/\b(\d{1,2})(st|nd|rd|th)?\b(?!\s*(:|am|pm|a\.m|p\.m))/g)].map((m) => m[1]);
+    return days.length > 0 && !days.includes(p.day);
+  }
+  if (field === "starts_at") {
+    const hours = [...v.matchAll(/\b(\d{1,2})(:\d\d)?\s*(am|pm|a\.m|p\.m)/g)].map((m) => m[1]);
+    return hours.length > 0 && !hours.includes(p.hour12);
+  }
+  return true;
+}
+
 /** The part of a long listing page that mentions this event (pages like weekly roundups list dozens). */
 function relevantText(page: string, title: string): string {
   if (page.length <= 9000) return page;
@@ -176,7 +197,8 @@ export async function recheckEvents(opts: { limit?: number; dryRun?: boolean; lo
         if (c.verdict === "confirmed" && backed && fields.includes(c.field) && !disputed.has(`${ev.id}:${c.field}`)) {
           confirmed.push(c.field);
           parts.push(`confirmed ${c.field}: "${c.quote}"`);
-        } else if (c.verdict === "different" && c.quote && squash(fetched.text).includes(squash(c.quote))) {
+        } else if (c.verdict === "different" && c.quote && squash(fetched.text).includes(squash(c.quote))
+          && contradicts(c.field, `${c.value ?? ""} ${c.quote}`, next!.starts_at)) {
           parts.push(`page differs on ${c.field}: ${c.value ?? ""}`);
           if (!opts.dryRun) await flag(ev.id, next!.id, "wrong_info", `AI re-check: the source page says ${c.field.replace("_", " ")} is "${c.value ?? "?"}" — quote: "${c.quote}"`);
         } else if (c.verdict === "confirmed" && !backed) {

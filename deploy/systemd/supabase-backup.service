@@ -1,0 +1,10 @@
+# One backup of the Supabase project (scripts/backup-db.ts) into ~/Backups. Started by the timer.
+[Unit]
+Description=Back up the Supabase project to ~/Backups
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/Afoot
+Environment=PATH=%h/.local/node/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=%h/.local/node/bin/npm run --silent backup:db
