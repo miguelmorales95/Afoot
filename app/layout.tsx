@@ -6,11 +6,11 @@ import SiteHeader from "@/components/SiteHeader";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "WhatsUp LA — small events near you",
+  title: "Afoot — small events near you",
   description:
     "Karaoke, game nights, live music and the small local events that never make it onto Eventbrite. Sourced from LA venue calendars and newsletters.",
   openGraph: {
-    title: "WhatsUp LA",
+    title: "Afoot",
     description: "The small local events near you that are hard to find anywhere else.",
     type: "website",
   },
@@ -32,7 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </AppProvider>
         <footer className="mx-auto max-w-6xl px-4 py-10 text-sm text-white/40">
           <p>
-            WhatsUp LA surfaces the small stuff — karaoke, game nights, local shows — from venue
+            Afoot surfaces the small stuff — karaoke, game nights, local shows — from venue
             calendars and newsletters. Know a spot we&apos;re missing?{" "}
             <Link href="/submit" className="text-fuchsia-400 hover:underline">
               Add it

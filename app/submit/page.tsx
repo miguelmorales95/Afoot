@@ -34,7 +34,7 @@ export default function SubmitPage() {
         <h1 className="mt-4 text-2xl font-bold">Thanks — got it!</h1>
         <p className="mt-2 text-white/60">
           We&apos;ll review the venue and start pulling in its events. The more small spots people
-          add, the better WhatsUp gets.
+          add, the better Afoot gets.
         </p>
         <Link
           href="/"

@@ -30,7 +30,7 @@ interface Loc {
   label: string;
 }
 
-const STORAGE_KEY = "whatsup_loc";
+const STORAGE_KEY = "afoot_loc";
 
 const FILTERS: { key: string; label: string }[] = [
   { key: "all", label: "Everything" },

@@ -1,5 +1,5 @@
 {
-  "name": "whatsup",
+  "name": "afoot",
   "version": "0.1.0",
   "private": true,
   "description": "Aggregates small, hard-to-find local events (LA) from venue calendars and newsletters.",
@@ -13,7 +13,9 @@
     "discover": "tsx scripts/discover.ts",
     "promote": "tsx scripts/promote.ts",
     "newsletters": "tsx scripts/newsletters.ts",
-    "newsletter:add": "tsx scripts/add-newsletter-source.ts"
+    "newsletter:add": "tsx scripts/add-newsletter-source.ts",
+    "geocode:csv": "tsx scripts/geocode-csv.ts",
+    "import:csv": "tsx scripts/import-csv.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.65.0",

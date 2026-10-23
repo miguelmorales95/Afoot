@@ -1,4 +1,4 @@
-// Cloudflare Email Worker — routes inbound newsletters to WhatsUp.
+// Cloudflare Email Worker — routes inbound newsletters to Afoot.
 //
 // Setup (free):
 //   1. Add your domain to Cloudflare and enable Email Routing.

@@ -9,7 +9,7 @@ export interface GeoResult {
 }
 
 const email = process.env.NOMINATIM_EMAIL || "";
-const UA = `WhatsUp-LA-events/0.1 (${email || "contact-unset"})`;
+const UA = `Afoot-events/0.1 (${email || "contact-unset"})`;
 
 export async function geocode(query: string): Promise<GeoResult | null> {
   const params = new URLSearchParams({

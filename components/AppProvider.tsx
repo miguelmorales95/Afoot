@@ -29,8 +29,8 @@ export const useApp = () => {
   return c;
 };
 
-const DEMO_USER_KEY = "whatsup_demo_user";
-const GOING_KEY = "whatsup_going";
+const DEMO_USER_KEY = "afoot_demo_user";
+const GOING_KEY = "afoot_going";
 
 function readGoingLocal(): Set<string> {
   try {

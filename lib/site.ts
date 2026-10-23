@@ -1,11 +1,11 @@
 // Small bits of client-safe site config.
 
 export const SUGGEST_EMAIL =
-  process.env.NEXT_PUBLIC_SUGGEST_EMAIL || "hello@whatsupla.app";
+  process.env.NEXT_PUBLIC_SUGGEST_EMAIL || "";
 
 /** A prefilled mailto: link for suggesting a venue/site. */
 export function suggestMailto(): string {
-  const subject = encodeURIComponent("New venue for WhatsUp LA");
+  const subject = encodeURIComponent("New venue for Afoot");
   const body = encodeURIComponent(
     [
       "Venue name:",

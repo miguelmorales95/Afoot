@@ -1,8 +1,8 @@
-# WhatsUp LA — Design Notes
+# Afoot — Design Notes
 
-WhatsUp follows the **company-wide design system**: see `Desktop/MASTER/Company-Design-System.md` (the source of truth for shared color tokens, typography, spacing/radius, motion, components, and accessibility).
+Afoot follows the **company-wide design system**: see [`Company-Design-System.md`](https://github.com/miguelmorales95/SomeDude_Company/blob/main/Company-Design-System.md) (the source of truth for shared color tokens, typography, spacing/radius, motion, components, and accessibility).
 
-## WhatsUp's personality within the system
+## Afoot's personality within the system
 - **Mood:** dark, modern, nightlife energy — fast and open, "Craigslist for events."
 - **Theme:** dark, near-black surfaces with electric magenta/cyan accents, mapped to the shared `--accent` / `--brand-2` token names.
 - **Illustration:** map-forward and photographic (venue imagery), neon accents on dark — not cute characters.
@@ -13,4 +13,4 @@ WhatsUp follows the **company-wide design system**: see `Desktop/MASTER/Company-
 - Adopt the shared **auth screen**, **avatar** (with profile), and **map / "near me"** components from `@company/ui` as they land.
 - Keep the existing privacy-first ad system; monetization leans on sponsorship / paid venue placement (see the roadmap), not tracking-based ads.
 
-See also the [Company Roadmap & Launch Plan](../MASTER/Company-Roadmap-and-Launch-Plan.md) for where WhatsUp sits in the launch sequence (it ships first).
+See also the [Company Roadmap & Launch Plan](https://github.com/miguelmorales95/SomeDude_Company/blob/main/Company-Roadmap-and-Launch-Plan.md) for where Afoot sits in the launch sequence (it ships first).

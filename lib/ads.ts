@@ -37,7 +37,7 @@ export interface HouseAd {
 // House ads — shown with the "house" provider, or as a fallback when a network
 // provider isn't configured. The first one sells the space itself.
 export function advertiseMailto(): string {
-  const subject = encodeURIComponent("Advertise on WhatsUp LA");
+  const subject = encodeURIComponent("Advertise on Afoot");
   return `mailto:${SUGGEST_EMAIL}?subject=${subject}`;
 }
 

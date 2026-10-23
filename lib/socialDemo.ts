@@ -38,15 +38,15 @@ export function demoAttendees(occurrenceId: string, self?: { id: string; name: s
     const name = POOL[(h + i * 3) % POOL.length];
     list.push({ user_id: `demo-p-${name}`, display_name: name, avatar_url: null });
   }
-  const going = read<string[]>("whatsup_going", []);
+  const going = read<string[]>("afoot_going", []);
   if (self && going.includes(occurrenceId)) {
     list.unshift({ user_id: self.id, display_name: self.name, avatar_url: null });
   }
   return list;
 }
 
-const OUT_KEY = "whatsup_demo_outgoing";
-const IN_KEY = "whatsup_demo_incoming";
+const OUT_KEY = "afoot_demo_outgoing";
+const IN_KEY = "afoot_demo_incoming";
 
 function seedIn(): IncomingRequest[] {
   return [
@@ -112,7 +112,7 @@ export function demoAddOutgoing(recipient: Attendee, occurrenceId: string | null
 }
 
 // --- demo event chat (per occurrence) ---
-const CHAT_PREFIX = "whatsup_demo_chat_";
+const CHAT_PREFIX = "afoot_demo_chat_";
 
 function seedChat(occurrenceId: string): ChatMessage[] {
   const who = demoAttendees(occurrenceId);
@@ -153,7 +153,7 @@ export interface DemoProfile {
   phone: string;
   share_phone: boolean;
 }
-const PROF_KEY = "whatsup_demo_profile";
+const PROF_KEY = "afoot_demo_profile";
 export function demoGetProfile(): DemoProfile {
   return read<DemoProfile>(PROF_KEY, { display_name: "You (demo)", phone: "", share_phone: true });
 }

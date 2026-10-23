@@ -1,4 +1,4 @@
--- WhatsUp schema. Run this in the Supabase SQL editor (or `supabase db push`).
+-- Afoot schema. Run this in the Supabase SQL editor (or `supabase db push`).
 -- Design: a venue has many events (series); each event has many concrete
 -- occurrences (expanded dates). The feed queries occurrences near a point.
 

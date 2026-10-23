@@ -12,7 +12,7 @@ export default function SiteHeader() {
         <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
           <span className="text-xl">📍</span>
           <span>
-            WhatsUp<span className="text-fuchsia-400"> LA</span>
+            Afoot<span className="text-fuchsia-400"> LA</span>
           </span>
         </Link>
         <nav className="flex items-center gap-2 text-sm text-white/70">

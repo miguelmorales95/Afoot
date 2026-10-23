@@ -1,4 +1,4 @@
-# WhatsUp LA
+# Afoot
 
 Aggregates the **small, hard-to-find local events** — karaoke, board game nights, open mics,
 neighborhood shows — that never make it onto Eventbrite/Dice/Partiful. It pulls events from
@@ -19,6 +19,25 @@ npm run dev     # http://localhost:3000  → search "Echo Park" or "Torrance"
 When Supabase isn't configured the app auto-serves built-in sample data, so you can explore the
 **List / Table / Map** views, filters, tags, and the submit flow immediately. Wire up the real
 database (below) when you're ready to ingest live events.
+
+### Test with real events from a CSV (no database)
+
+`data/events.csv` holds researched, real LA events with source links. To serve the feed from it:
+
+```bash
+echo "LOCAL_EVENTS_FILE=data/events.csv" >> .env.local
+npm run dev
+```
+
+The file takes priority over demo mode and Supabase. Search uses real geocoding in this mode.
+Columns are documented in `lib/localEvents.ts`.
+
+- `npm run geocode:csv`: fill in `venue_lat` / `venue_lng` for new rows (Nominatim, 1 request/second)
+- `npm run import:csv -- --dry-run`, then `npm run import:csv`: load the file into Supabase. Re-running
+  updates rows instead of duplicating them.
+
+On Vercel, set `LOCAL_EVENTS_FILE=data/events.csv` in the project's environment variables. Submissions
+and `/admin` still need Supabase.
 
 ---
 

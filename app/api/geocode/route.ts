@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { geocode } from "@/lib/geocode";
 import { demoGeocode, isDemoMode } from "@/lib/demo";
+import { hasLocalEvents } from "@/lib/localEvents";
 
 // GET /api/geocode?q=Echo Park
 // Server-side proxy to Nominatim (keeps the required User-Agent/email server-side
@@ -13,7 +14,8 @@ export async function GET(req: NextRequest) {
   }
 
   // In demo mode, resolve against a small built-in LA gazetteer (works offline).
-  if (isDemoMode()) {
+  // Local-file mode holds real events across LA, so it uses real geocoding.
+  if (isDemoMode() && !hasLocalEvents()) {
     return NextResponse.json(demoGeocode(q));
   }
 

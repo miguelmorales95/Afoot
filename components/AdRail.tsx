@@ -10,7 +10,7 @@ export default function AdRail() {
         <AdUnit index={0} className="min-h-[200px]" slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_RAIL} />
         <AdUnit index={1} className="min-h-[200px]" />
         <p className="px-1 text-[10px] leading-relaxed text-white/20">
-          Ads keep WhatsUp free. No cookies, no tracking.
+          Ads keep Afoot free. No cookies, no tracking.
         </p>
       </div>
     </aside>

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import type { ReviewGroup } from "@/lib/types";
 
-const TOKEN_KEY = "whatsup_admin_token";
+const TOKEN_KEY = "afoot_admin_token";
 
 export default function AdminPage() {
   const [groups, setGroups] = useState<ReviewGroup[]>([]);
