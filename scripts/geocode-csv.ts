@@ -28,18 +28,19 @@ async function main() {
     if (row.venue_lat && row.venue_lng) continue;
     const address = row.venue_address || `${row.venue_name}, ${row.neighborhood}, Los Angeles, CA`;
     if (!cache.has(address)) {
+      // A result outside the address's ZIP is a different street with the same name
+      // ("107 4th St" matched Manhattan Beach instead of downtown LA), so reject it.
+      const zip = address.match(/\b(9\d{4})\b/)?.[1];
+      const lookup = async (q: string) => {
+        const g = await geocode(q);
+        await sleep(1100);
+        return g && (!zip || g.label.includes(zip)) ? g : null;
+      };
       // Nominatim doesn't understand suite/unit numbers; then fall back to the venue name.
-      let geo = await geocode(address);
-      await sleep(1100);
+      let geo = await lookup(address);
       const street = address.replace(/,?\s*(suite|ste\.?|unit|#)\s*[\w-]+/i, "");
-      if (!geo && street !== address) {
-        geo = await geocode(street);
-        await sleep(1100);
-      }
-      if (!geo && row.venue_name) {
-        geo = await geocode(`${row.venue_name}, ${row.neighborhood || "Los Angeles"}, CA`);
-        await sleep(1100);
-      }
+      if (!geo && street !== address) geo = await lookup(street);
+      if (!geo && row.venue_name) geo = await lookup(`${row.venue_name}, ${row.neighborhood || "Los Angeles"}, CA${zip ? ` ${zip}` : ""}`);
       cache.set(address, geo ? { lat: geo.lat, lng: geo.lng } : null);
     }
     const hit = cache.get(address);
