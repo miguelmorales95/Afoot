@@ -27,3 +27,23 @@ body {
 .ad-slot .ad-fallback { display: block; }
 .ad-slot ins.adsbygoogle[data-ad-status="filled"] + .ad-fallback { display: none; }
 .ad-slot ins.adsbygoogle[data-ad-status="unfilled"] { display: none !important; }
+
+/* Event map popups: match the app's dark cards instead of MapLibre's white default. */
+.events-map .maplibregl-popup-content {
+  background: #16161f;
+  color: var(--foreground);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+.events-map .maplibregl-popup-content a { color: #f0abfc; }
+.events-map .maplibregl-popup-content a:hover { text-decoration: underline; }
+.events-map .maplibregl-popup-close-button { color: rgba(255, 255, 255, 0.5); }
+.events-map .maplibregl-popup-anchor-top .maplibregl-popup-tip,
+.events-map .maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.events-map .maplibregl-popup-anchor-top-right .maplibregl-popup-tip { border-bottom-color: #16161f; }
+.events-map .maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+.events-map .maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.events-map .maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip { border-top-color: #16161f; }
+.events-map .maplibregl-popup-anchor-left .maplibregl-popup-tip { border-right-color: #16161f; }
+.events-map .maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: #16161f; }

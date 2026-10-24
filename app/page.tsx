@@ -15,6 +15,7 @@ import AdUnit from "@/components/AdUnit";
 import EventsTable from "@/components/EventsTable";
 import GoingButton from "@/components/GoingButton";
 import EventFeedback, { UnconfirmedBadges } from "@/components/EventFeedback";
+import VenueMiniMap from "@/components/VenueMiniMap";
 import { LAUNCH_AREAS, type LaunchArea } from "@/lib/areas";
 
 const EventsMap = dynamic(() => import("@/components/EventsMap"), {
@@ -290,6 +291,19 @@ export default function Home() {
           </div>
         ))}
 
+      {!loading && view === "list" && grouped.length > 0 && (
+        <p className="-mt-4 mb-6 text-[11px] text-white/30">
+          Street maps ©{" "}
+          <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="underline hover:text-white/60">
+            OpenStreetMap
+          </a>{" "}
+          contributors · OpenMapTiles ·{" "}
+          <a href="https://openfreemap.org" target="_blank" rel="noopener noreferrer" className="underline hover:text-white/60">
+            OpenFreeMap
+          </a>
+        </p>
+      )}
+
           {/* One unobtrusive house ad for mobile (rail is hidden there) */}
           {loc && visible.length > 0 && (
             <div className="mt-6 lg:hidden">
@@ -307,10 +321,15 @@ export default function Home() {
 function EventCard({ ev, feedback }: { ev: NearbyEvent; feedback: boolean }) {
   const cat = categoryMeta(ev.category);
   const body = (
-    <div className="group flex gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 transition hover:border-white/20 hover:bg-white/[0.05]">
-      <div className="flex w-16 shrink-0 flex-col items-center justify-center rounded-xl bg-white/5 py-2 text-center">
-        <div className="text-lg leading-none">{cat.emoji}</div>
-        <div className="mt-1 text-xs font-semibold text-white/80">{formatTime(ev.starts_at)}</div>
+    <div className="group flex gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 transition hover:border-white/20 hover:bg-white/[0.05] sm:gap-4">
+      <div className="flex w-24 shrink-0 flex-col gap-1.5 sm:w-32">
+        <time
+          dateTime={ev.starts_at}
+          className="rounded-lg bg-white/5 py-1 text-center text-sm font-semibold text-white/90"
+        >
+          {formatTime(ev.starts_at)}
+        </time>
+        <VenueMiniMap lat={ev.venue_lat} lng={ev.venue_lng} venue={ev.venue_name} />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-3">
@@ -320,7 +339,7 @@ function EventCard({ ev, feedback }: { ev: NearbyEvent; feedback: boolean }) {
           <span
             className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ${cat.className}`}
           >
-            {cat.label}
+            {cat.emoji} {cat.label}
           </span>
         </div>
         <p className="mt-0.5 text-sm text-white/55">
