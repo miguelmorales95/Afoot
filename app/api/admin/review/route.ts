@@ -1,21 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { adminAuthed } from "@/lib/adminAuth";
 import { getReviewGroups, applyAction } from "@/lib/admin";
 import { demoReviewGroups, isDemoMode } from "@/lib/demo";
 import type { ReviewGroup } from "@/lib/types";
 
 // Admin review queue. Protected by ADMIN_TOKEN (header x-admin-token or
-// ?token=). If ADMIN_TOKEN is unset, access is open (fine for local/demo).
+// ?token=). If ADMIN_TOKEN is unset, only local development is open (lib/adminAuth.ts).
 export const dynamic = "force-dynamic";
 
-function authed(req: NextRequest): boolean {
-  const token = process.env.ADMIN_TOKEN;
-  if (!token) return true; // not configured -> open (local/demo)
-  const provided = req.headers.get("x-admin-token") || req.nextUrl.searchParams.get("token");
-  return provided === token;
-}
 
 export async function GET(req: NextRequest) {
-  if (!authed(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!adminAuthed(req, { allowQuery: true })) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   if (isDemoMode()) {
     return NextResponse.json({ groups: demoReviewGroups(), demo: true });
@@ -30,7 +25,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!authed(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!adminAuthed(req, { allowQuery: true })) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   let body: { action?: "approve" | "reject"; group?: ReviewGroup };
   try {

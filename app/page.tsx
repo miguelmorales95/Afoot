@@ -17,6 +17,9 @@ import GoingButton from "@/components/GoingButton";
 import EventFeedback, { UnconfirmedBadges } from "@/components/EventFeedback";
 import VenueMiniMap from "@/components/VenueMiniMap";
 import { LAUNCH_AREAS, type LaunchArea } from "@/lib/areas";
+import { areaForLocation, campaignsFor, type LiveCampaign } from "@/lib/ads";
+import { useLiveCampaigns, useSeen } from "@/lib/sponsorClient";
+import { WhySponsored } from "@/components/SponsorCard";
 
 const EventsMap = dynamic(() => import("@/components/EventsMap"), {
   ssr: false,
@@ -151,17 +154,35 @@ export default function Home() {
     [events, filter],
   );
 
+  // The launch area being browsed (chip, or a search/location near one): picks the area
+  // sponsor and featured events. Worked out here; never sent anywhere.
+  const area = areaForLocation(loc);
+  const campaigns = useLiveCampaigns();
+
+  // Featured events (paid): the next date of each featured event in these results is
+  // pinned above the day list (list view only), labeled "Featured" and "Sponsored".
+  const featured = useMemo(() => {
+    const out: { ev: NearbyEvent; campaign: LiveCampaign }[] = [];
+    for (const c of campaignsFor(campaigns, "featured_event", area)) {
+      const ev = visible.find((e) => e.event_id === c.event_id && !e.cancelled);
+      if (ev && !out.some((f) => f.ev.event_id === ev.event_id)) out.push({ ev, campaign: c });
+    }
+    return out.slice(0, 3);
+  }, [campaigns, area, visible]);
+
   // Group visible events by day, injecting an ad after the first day group.
   const grouped = useMemo(() => {
+    const pinned = new Set(featured.map((f) => f.ev.occurrence_id));
     const map = new Map<string, NearbyEvent[]>();
     for (const ev of visible) {
+      if (pinned.has(ev.occurrence_id)) continue;
       const k = dayKey(ev.starts_at);
       const bucket = map.get(k);
       if (bucket) bucket.push(ev);
       else map.set(k, [ev]);
     }
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [visible]);
+  }, [visible, featured]);
 
   return (
     <main className="mx-auto max-w-6xl px-4">
@@ -276,6 +297,17 @@ export default function Home() {
         <EventsMap events={visible} center={[loc.lat, loc.lng]} />
       )}
 
+      {!loading && view === "list" && featured.length > 0 && (
+        <div className="mb-8">
+          <h2 className="py-2 text-sm font-semibold uppercase tracking-wider text-white/40">Featured</h2>
+          <div className="mt-2 space-y-3">
+            {featured.map(({ ev, campaign }) => (
+              <EventCard key={ev.occurrence_id} ev={ev} feedback={feedback} featured={campaign} />
+            ))}
+          </div>
+        </div>
+      )}
+
       {!loading &&
         view === "list" &&
         grouped.map(([key, dayEvents], i) => (
@@ -307,21 +339,22 @@ export default function Home() {
           {/* One unobtrusive house ad for mobile (rail is hidden there) */}
           {loc && visible.length > 0 && (
             <div className="mt-6 lg:hidden">
-              <AdUnit index={0} className="min-h-[140px]" />
+              <AdUnit index={0} area={area} className="min-h-[140px]" />
             </div>
           )}
         </div>
 
-        <AdRail />
+        <AdRail area={area} />
       </div>
     </main>
   );
 }
 
-function EventCard({ ev, feedback }: { ev: NearbyEvent; feedback: boolean }) {
+function EventCard({ ev, feedback, featured }: { ev: NearbyEvent; feedback: boolean; featured?: LiveCampaign }) {
   const cat = categoryMeta(ev.category);
+  const seenRef = useSeen(featured?.id ?? null);
   const body = (
-    <div className="group flex gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 transition hover:border-white/20 hover:bg-white/[0.05] sm:gap-4">
+    <div ref={featured ? seenRef : undefined} className="group flex gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 transition hover:border-white/20 hover:bg-white/[0.05] sm:gap-4">
       <div className="flex w-24 shrink-0 flex-col gap-1.5 sm:w-32">
         <time
           dateTime={ev.starts_at}
@@ -342,6 +375,17 @@ function EventCard({ ev, feedback }: { ev: NearbyEvent; feedback: boolean }) {
             {cat.emoji} {cat.label}
           </span>
         </div>
+        {featured && (
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-fuchsia-500/15 px-2 py-0.5 text-[11px] font-medium text-fuchsia-300 ring-1 ring-fuchsia-500/30">
+              Featured
+            </span>
+            {/* Pinned above the day list, so say which day. */}
+            <span className="text-[11px] text-white/50">{formatDayLabel(ev.starts_at)}</span>
+            <span className="text-[10px] uppercase tracking-widest text-white/40">Sponsored</span>
+            <WhySponsored className="" />
+          </div>
+        )}
         <p className="mt-0.5 text-sm text-white/55">
           {ev.venue_name} · {formatDistance(ev.distance_km)} away
           {ev.price ? ` · ${ev.price}` : ""}
@@ -369,6 +413,15 @@ function EventCard({ ev, feedback }: { ev: NearbyEvent; feedback: boolean }) {
       </div>
     </div>
   );
+
+  // A featured event links through /go/<campaign> (counts a click, then the campaign's link).
+  if (featured) {
+    return (
+      <a href={`/go/${featured.id}`} target="_blank" rel="sponsored noopener" className="block">
+        {body}
+      </a>
+    );
+  }
 
   return ev.url ? (
     <a href={ev.url} target="_blank" rel="noopener noreferrer" className="block">

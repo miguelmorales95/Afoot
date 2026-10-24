@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { adminAuthed } from "@/lib/adminAuth";
 import { supabase, hasSupabase } from "@/lib/supabase";
 import type { FlaggedEvent } from "@/lib/types";
 
@@ -6,15 +7,10 @@ import type { FlaggedEvent } from "@/lib/types";
 // grouped by event. Protected by ADMIN_TOKEN like the review queue.
 export const dynamic = "force-dynamic";
 
-function authed(req: NextRequest): boolean {
-  const token = process.env.ADMIN_TOKEN;
-  if (!token) return true; // not configured -> open (local only)
-  return req.headers.get("x-admin-token") === token;
-}
 
 
 export async function GET(req: NextRequest) {
-  if (!authed(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!adminAuthed(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   if (!hasSupabase) return NextResponse.json({ events: [] });
 
   const { data, error } = await supabase
@@ -54,7 +50,7 @@ export async function GET(req: NextRequest) {
 
 // { eventId, action: "dismiss" | "hide" | "restore" }
 export async function POST(req: NextRequest) {
-  if (!authed(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!adminAuthed(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const { eventId, action } = await req.json().catch(() => ({}));
   if (typeof eventId !== "string" || !["dismiss", "hide", "restore"].includes(action)) {
     return NextResponse.json({ error: "invalid body" }, { status: 400 });

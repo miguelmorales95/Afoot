@@ -31,3 +31,6 @@ yarn-error.log*
 # editor
 .vscode/
 .idea/
+
+# sponsor reports (npm run ads:report): business contacts and numbers, keep local
+/reports/

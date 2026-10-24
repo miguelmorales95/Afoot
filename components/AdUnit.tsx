@@ -8,9 +8,11 @@ import {
   ADSENSE_PERSONALIZED,
   ETHICALADS_PUBLISHER,
   HOUSE_ADS,
-  SPONSORS,
+  campaignsFor,
   type HouseAd,
 } from "@/lib/ads";
+import { useLiveCampaigns } from "@/lib/sponsorClient";
+import SponsorCard from "./SponsorCard";
 
 declare global {
   interface Window {
@@ -31,21 +33,25 @@ function loadScriptOnce(id: string, src: string, attrs: Record<string, string> =
 
 /**
  * A single ad placement, filled in order so it's never empty:
- *   1. a paid local sponsor (SPONSORS), 2. the ad network, if configured,
+ *   1. a paid local sponsor: a live "area_sponsor" campaign for `area` (the area the
+ *      visitor is browsing), then campaigns for "all" areas,
+ *   2. the ad network, if configured,
  *   3. a house promo (also shown when AdSense has no ad for the slot).
  * `index` picks which sponsor / promo; `slot` is the AdSense slot id.
  */
 export default function AdUnit({
   index = 0,
   slot,
+  area = null,
   className = "",
 }: {
   index?: number;
   slot?: string;
+  area?: string | null;
   className?: string;
 }) {
   const provider = adProvider();
-  const sponsor = SPONSORS.length > index ? SPONSORS[index] : null;
+  const sponsor = campaignsFor(useLiveCampaigns(), "area_sponsor", area)[index] ?? null;
   const network = !sponsor && (
     (provider === "ethicalads" && !!ETHICALADS_PUBLISHER) || (provider === "adsense" && !!ADSENSE_CLIENT && !!slot)
   );
@@ -78,7 +84,7 @@ export default function AdUnit({
   }, [provider, network]);
 
   if (provider === "none") return null;
-  if (sponsor) return <HouseCard ad={sponsor} label="Sponsor" className={className} />;
+  if (sponsor) return <SponsorCard key={sponsor.id} campaign={sponsor} className={className} />;
 
   // --- EthicalAds (contextual, cookieless) ---
   if (network && provider === "ethicalads") {
@@ -116,7 +122,7 @@ export default function AdUnit({
   return <HouseCard ad={HOUSE_ADS[index % HOUSE_ADS.length]} className={className} />;
 }
 
-function HouseCard({ ad, className = "", label = "Sponsor" }: { ad: HouseAd; className?: string; label?: string }) {
+function HouseCard({ ad, className = "", label = "From Afoot" }: { ad: HouseAd; className?: string; label?: string }) {
   const inner = (
     <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.03] p-4">
       <div className="mb-2 flex items-center justify-between">
@@ -130,7 +136,7 @@ function HouseCard({ ad, className = "", label = "Sponsor" }: { ad: HouseAd; cla
   );
 
   return (
-    <div className={className} aria-label="Sponsor message" role="complementary">
+    <div className={className} aria-label="Message from Afoot" role="complementary">
       {ad.href.startsWith("/") ? (
         <Link href={ad.href} className="block h-full">
           {inner}

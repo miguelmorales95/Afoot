@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import type { ReviewGroup } from "@/lib/types";
 import FlagQueue from "@/components/FlagQueue";
+import SponsorAdmin from "@/components/SponsorAdmin";
 
 const TOKEN_KEY = "afoot_admin_token";
 
@@ -112,6 +113,8 @@ export default function AdminPage() {
       )}
 
       {!loading && !demo && <FlagQueue />}
+
+      {!loading && !demo && <SponsorAdmin />}
 
       {loading && <p className="mt-10 text-white/40">Loading…</p>}
 

@@ -138,7 +138,8 @@ Thresholds live in `app/api/feedback/route.ts`.
 A single screen to triage what to add. It merges community **submissions** and crawler-discovered
 **candidates**, **drops any site you already track**, and **groups duplicate suggestions by site**
 (so three people suggesting the same bar show as one card). Approve to create the venue (the next
-ingest pulls its events); reject to dismiss. Gate it with `ADMIN_TOKEN` in production.
+ingest pulls its events); reject to dismiss. **Set `ADMIN_TOKEN` in production:** without it the
+admin routes refuse everyone on a deployed site (they're open only in local development).
 
 ### JS-rendered sites (Zebulon, etc.)
 
@@ -249,10 +250,16 @@ app/
   api/submit/route.ts       # POST venue submission
   api/cron/ingest/route.ts  # scheduled ingestion (Vercel Cron)
   api/inbound-email/route.ts # ⭐ newsletter webhook (provider-agnostic)
+  api/admin/sponsors/route.ts # sponsors + campaigns for /admin (ADMIN_TOKEN gated)
+  api/ads/live/route.ts     # GET live sponsor campaigns (card text only, CDN-cacheable)
+  api/ads/seen/route.ts     # POST batched sponsor views (counts only)
+  go/[campaignId]/route.ts  # sponsor click: +1, then redirect with UTM tags
 components/
   EventsTable.tsx           # sortable table view
   EventsMap.tsx             # Leaflet map view (dynamic, client-only)
-  AdSlot.tsx                # inline ad placeholder
+  AdUnit.tsx / AdRail.tsx   # ad slots: sponsor -> network -> house promo
+  SponsorCard.tsx           # paid card with "Sponsored" + "Why am I seeing this?"
+  SponsorAdmin.tsx          # /admin Sponsors section
 lib/
   llm.ts                    # ⭐ provider-agnostic LLM (Claude OR local Ollama)
   extract.ts                # event extractor (events + recurrence expansion + tags)
@@ -268,6 +275,9 @@ lib/
   supabase.ts               # server-only Supabase client (lazy)
   format.ts                 # client-safe date/category/tag display helpers
   site.ts                   # public config (suggest-a-venue email)
+  ads.ts                    # ad providers, house promos, campaign types, visitor area
+  campaigns.ts              # server: live campaigns (60 s cache), view/click counters
+  sponsorClient.ts          # browser: load campaigns, report seen cards by beacon
   types.ts
 scripts/
   discover.ts               # CLI: web discovery crawler (--loop to leave running)
@@ -276,9 +286,11 @@ scripts/
   newsletters.ts            # CLI: IMAP poller for newsletter inboxes (--loop)
   add-newsletter-source.ts  # CLI: map a newsletter sender -> venue
   geocode-venues.ts         # CLI: backfill venue coordinates
+  ads-report.ts             # CLI: monthly sponsor reports (npm run ads:report)
 supabase/
   schema.sql                # tables + nearby_events() + RLS
   seed.sql                  # the 3 starter venues
+  migrations/               # standalone changes to apply on their own (sponsor campaigns)
 docs/
   cloudflare-email-worker.js # inbound-email Worker for the newsletter webhook
 ```
@@ -291,8 +303,8 @@ Ads are **side-rail only** (next to the table/map on desktop; hidden on small sc
 phones fast), **cookieless, and do not track users**. Set the provider with
 `NEXT_PUBLIC_AD_PROVIDER`:
 
-- **`house`** (default) — sponsor cards you control (`lib/ads.ts`). Zero external scripts, zero
-  tracking. The built-in "Your spot here" card is how you sell inventory directly (flat-rate).
+- **`house`** (default) — sponsor cards you control (see [Sponsors](#sponsors)) and house promos
+  (`lib/ads.ts`). Zero external scripts, zero tracking. The built-in "Your spot here" card is how you sell inventory directly (flat-rate).
 - **`ethicalads`** — [EthicalAds](https://www.ethicalads.io/): contextual, privacy-respecting, no
   cookies. Set `NEXT_PUBLIC_ETHICALADS_PUBLISHER`. The recommended network for this project.
 - **`adsense`** — Google AdSense. It works, but it **tracks users** — only use it if you accept
@@ -301,6 +313,50 @@ phones fast), **cookieless, and do not track users**. Set the provider with
 The site collects no accounts, sets no analytics, and only uses `localStorage` to remember your
 last location on your own device. That's the "Craigslist for events" stance: fast, open, and
 light enough to work on an old phone.
+
+## Sponsors
+
+Paid local sponsors are sold directly at a flat rate (see the Afoot Sponsorship Playbook in the
+company docs) and managed in **`/admin` → Sponsors**. Set-up once: apply
+`supabase/migrations/20261023120000_sponsor_campaigns.sql` (also at the end of `schema.sql`).
+Until then the site behaves as before, with house promos in every slot.
+
+- **Add a sponsor:** *+ New sponsor* (business name, contact, email for the monthly report,
+  optional Stripe customer id, notes such as their promo phrase).
+- **Add a campaign:** *+ Campaign* on the sponsor. Pick the product, the area (a launch area from
+  `lib/areas.ts`, or *All areas*), dates (inclusive, LA time) and paste the approved card text
+  (badge, title ~30 chars, line ~90, button ~20, link). The form shows a live preview.
+  - **Area sponsor card:** fills the ad slots (side rail on desktop, the card under the list on
+    phones) for people browsing that area. Fill order per slot: sponsor → ad network → house promo.
+  - **Featured event:** search for the event; its next date is pinned in a *Featured* block above
+    the list (list view only) for people browsing that area, labeled *Featured* and *Sponsored*.
+- **Status:** `draft` → `approved` → `live` (shows while today is within its dates) → `paused` /
+  `ended`. Changes reach the site within about a minute (live campaigns are cached for 60 s).
+- Every paid card says **Sponsored** and has a *Why am I seeing this?* note: "Afoot shows the same
+  sponsor to everyone browsing this area. We don't track you."
+
+**Which area a visitor is browsing** is worked out in the browser: the neighborhood chip they
+tapped, or the launch area within ~6 km of the place they searched or their location (nearest
+wins). The browser downloads all live campaigns (`/api/ads/live`, identical for everyone) and picks
+locally, so no location is sent for ads.
+
+**Counting (counts only):**
+
+| Number | How | Stored |
+|---|---|---|
+| Views | A paid card at least 50% on screen, once per page view; ids are batched and sent with `navigator.sendBeacon` to `/api/ads/seen` when the page is hidden | +1 on `(campaign, day)` in `campaign_daily` |
+| Clicks | The card links to `/go/<campaign>`, which adds +1 and redirects (302) to the sponsor's link with `utm_source=afoot&utm_medium=sponsor&utm_campaign=<area>` | +1 on `(campaign, day)` |
+
+Nothing else is stored: no cookies, IPs, device ids or user agents (the user agent is only read
+to skip obvious bots). Days are Los Angeles days. Because nothing identifies a visitor, counts can
+be inflated by someone scripting a real browser; treat sudden spikes with suspicion rather than
+adding tracking to stop them.
+
+**Monthly report:** `npm run ads:report -- --month 2026-10` writes, for each sponsor with activity
+that month, `reports/ads/2026-10/<sponsor>.html` and `.txt` (views, clicks and click rate per week,
+the card text, and a promo-phrase suggestion). `reports/` is gitignored. Add `--send` to also email
+each sponsor's contact through Resend; that needs `RESEND_API_KEY` and `ADS_REPORT_FROM` in
+`.env.local` (a sender on a domain verified in Resend). Without `--month` it reports last month.
 
 ## Known limitations & next steps
 
