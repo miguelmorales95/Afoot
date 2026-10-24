@@ -316,6 +316,10 @@ light enough to work on an old phone.
 
 ## Sponsors
 
+**Site traffic** for sponsor pitches comes from Vercel Web Analytics (`<Analytics />` in `app/layout.tsx`):
+page visits per day and per page, with no cookies and nothing that follows a person across days. Turn it
+on under the afoot project's **Analytics** tab in Vercel.
+
 Paid local sponsors are sold directly at a flat rate (see the Afoot Sponsorship Playbook in the
 company docs) and managed in **`/admin` → Sponsors**. Set-up once: apply
 `supabase/migrations/20261023120000_sponsor_campaigns.sql` (also at the end of `schema.sql`).

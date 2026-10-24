@@ -24,6 +24,7 @@
     "@anthropic-ai/sdk": "^0.65.0",
     "@mapbox/vector-tile": "^3.0.0",
     "@supabase/supabase-js": "^2.45.0",
+    "@vercel/analytics": "^1.6.1",
     "imapflow": "^1.0.164",
     "mailparser": "^3.7.1",
     "maplibre-gl": "^5.24.0",

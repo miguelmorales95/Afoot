@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
+import { Analytics } from "@vercel/analytics/next";
 import { suggestMailto } from "@/lib/site";
 import AppProvider from "@/components/AppProvider";
 import SiteHeader from "@/components/SiteHeader";
@@ -30,6 +31,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <SiteHeader />
           {children}
         </AppProvider>
+        {/* Page-visit counts for sponsor reports: no cookies, nothing that follows a person
+            across days. Turn on under the project's Analytics tab in Vercel. */}
+        <Analytics />
         <footer className="mx-auto max-w-6xl px-4 py-10 text-sm text-white/40">
           <p>
             Afoot surfaces the small stuff — karaoke, game nights, local shows — from venue
