@@ -16,8 +16,9 @@ export default function VenueMiniMap({
   const [failed, setFailed] = useState(false);
   if (failed || !Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) return null;
 
-  // Round so nearby events at one venue share a cached URL.
-  const src = `/api/minimap?lat=${lat.toFixed(4)}&lng=${lng.toFixed(4)}`;
+  // Round so nearby events at one venue share a cached URL. Bump v when the drawing
+  // changes: browsers keep these images for 30 days.
+  const src = `/api/minimap?lat=${lat.toFixed(4)}&lng=${lng.toFixed(4)}&v=2`;
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
