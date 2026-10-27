@@ -23,9 +23,30 @@ export function todayISODate(tz = "America/Los_Angeles"): string {
   }).format(new Date());
 }
 
+/** Future dates of an event that aren't in `listed` (epoch ms): those with RSVPs or chat
+ *  messages to keep (as cancelled), and the rest to delete. */
+async function staleOccurrences(eventId: string, listed: number[]) {
+  const { data } = await supabase
+    .from("event_occurrences")
+    .select("id, starts_at")
+    .eq("event_id", eventId)
+    .gte("starts_at", new Date().toISOString());
+  const stale = (data ?? []).filter((o) => !listed.includes(Date.parse(o.starts_at))).map((o) => o.id as string);
+  if (!stale.length) return { keep: [] as string[], remove: [] as string[] };
+  const [going, chat] = await Promise.all([
+    supabase.from("rsvps").select("occurrence_id").in("occurrence_id", stale),
+    supabase.from("messages").select("occurrence_id").in("occurrence_id", stale),
+  ]);
+  // If either lookup fails, delete nothing: keeping a stale date is better than losing a chat.
+  if (going.error || chat.error) return { keep: stale, remove: [] as string[] };
+  const used = new Set([...(going.data ?? []), ...(chat.data ?? [])].map((r) => r.occurrence_id as string));
+  return { keep: stale.filter((id) => used.has(id)), remove: stale.filter((id) => !used.has(id)) };
+}
+
 /**
  * Upsert a batch of extracted events (and their occurrences) for one venue.
- * Idempotent: events keyed by dedupe_key, future occurrences replaced.
+ * Idempotent: events keyed by dedupe_key; future occurrences updated in place, and dates the
+ * source dropped removed (or marked cancelled if anyone RSVP'd or chatted).
  * Shared by website ingestion and newsletter ingestion.
  */
 export async function storeExtractedEvents(opts: {
@@ -68,13 +89,6 @@ export async function storeExtractedEvents(opts: {
       continue;
     }
 
-    // Replace this event's future occurrences so cancellations fall off.
-    await supabase
-      .from("event_occurrences")
-      .delete()
-      .eq("event_id", eventRow.id)
-      .gte("starts_at", new Date().toISOString());
-
     const rows = ev.occurrences
       .map((o) => ({ event_id: eventRow.id, starts_at: o.start, ends_at: o.end }))
       .filter((r) => {
@@ -82,10 +96,20 @@ export async function storeExtractedEvents(opts: {
         return !Number.isNaN(t) && t >= Date.now() - 12 * 3600 * 1000;
       });
 
+    // Dates the page no longer lists fall off, but never by deleting a date people said they're
+    // going to or chatted about: those are marked cancelled instead (deleting would take their
+    // RSVPs and messages with it). Dates still listed are updated in place, keeping their id.
+    const dropped = await staleOccurrences(eventRow.id, rows.map((r) => Date.parse(r.starts_at)));
+    if (dropped.keep.length) {
+      await supabase.from("event_occurrences").update({ cancelled: true }).in("id", dropped.keep);
+      log(`  ~ "${ev.title}": ${dropped.keep.length} dropped date(s) have RSVPs or chat; marked cancelled`);
+    }
+    if (dropped.remove.length) await supabase.from("event_occurrences").delete().in("id", dropped.remove);
+
     if (rows.length) {
       const { error: occErr } = await supabase
         .from("event_occurrences")
-        .upsert(rows, { onConflict: "event_id,starts_at", ignoreDuplicates: true });
+        .upsert(rows, { onConflict: "event_id,starts_at" });
       if (occErr) log(`  ! occurrences for "${ev.title}": ${occErr.message}`);
       else occurrenceCount += rows.length;
     }

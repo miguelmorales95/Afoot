@@ -13,7 +13,9 @@ export const maxDuration = 300; // seconds; raise your Vercel plan's limit as ve
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
   const auth = req.headers.get("authorization");
-  if (secret && auth !== `Bearer ${secret}`) {
+  // No secret set means no scheduled runs: an open route would let anyone start paid AI work.
+  if (!secret) return NextResponse.json({ error: "CRON_SECRET is not set" }, { status: 503 });
+  if (auth !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
