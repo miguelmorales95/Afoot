@@ -58,13 +58,15 @@ async function completeOllama(o: CompleteOpts): Promise<string> {
       model,
       stream: false,
       format: o.json ? "json" : undefined,
-      options: { temperature: o.temperature ?? 0.2, num_predict: o.maxTokens ?? 4000 },
+      // Ollama reads only 2-4k tokens by default and silently drops the rest of a long
+      // page, so ask for a bigger window (OLLAMA_NUM_CTX to tune for the machine's memory).
+      options: { temperature: o.temperature ?? 0.2, num_predict: o.maxTokens ?? 4000, num_ctx: Number(process.env.OLLAMA_NUM_CTX || 16384) },
       messages: [
         { role: "system", content: o.system },
         { role: "user", content: o.prompt },
       ],
     }),
-    signal: AbortSignal.timeout(120000),
+    signal: AbortSignal.timeout(Number(process.env.OLLAMA_TIMEOUT_MS || 120000)),
   });
   if (!res.ok) {
     throw new Error(`Ollama ${res.status}: ${await res.text().catch(() => "")}`);

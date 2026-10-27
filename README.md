@@ -187,7 +187,9 @@ Fill in:
 | `ANTHROPIC_API_KEY` | From console.anthropic.com |
 | `EXTRACTION_MODEL` | `claude-haiku-5-5` (bump to `claude-sonnet-5-5` for tougher pages) |
 | `NOMINATIM_EMAIL` | Your email (Nominatim's usage policy requires a contact) |
-| `CRON_SECRET` | Any random string; protects the scheduled ingest route |
+| `CRON_SECRET` | A long random string (`openssl rand -hex 32`). **Required:** without it the scheduled ingest route refuses to run |
+| `OLLAMA_NUM_CTX` | Local model's context window (default 16384); Ollama's own default drops most of a long page |
+| `OLLAMA_TIMEOUT_MS` | How long to wait for the local model per page (default 120000). On a machine without a GPU a long page can take over 5 minutes, which hits Node's own request limit: use Anthropic for bulk ingests there |
 
 ### 4. Discover venues (optional but recommended before launch)
 
@@ -246,7 +248,10 @@ Search a neighborhood (e.g. *Torrance*) or click **use my current location**.
 1. Push to GitHub, import the repo in Vercel.
 2. Add all the env vars from `.env.local` in the Vercel project settings.
 3. `vercel.json` already registers a daily cron (`9:00 UTC`) hitting `/api/cron/ingest`,
-   which re-runs ingestion for every active venue. Adjust the schedule there.
+   which re-runs ingestion for active venues, longest since last tried first, for up to 4 minutes
+   (the rest go first the next day). Adjust the schedule there.
+4. Re-ingesting never deletes a date anyone RSVP'd to or chatted about: if the venue drops it,
+   it's marked cancelled instead. Other dates the page no longer lists are removed.
 
 ---
 

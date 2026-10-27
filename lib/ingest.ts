@@ -202,14 +202,18 @@ export async function ingestVenue(
 }
 
 export async function ingestAll(
-  opts: { onlySlug?: string; dryRun?: boolean; log?: (s: string) => void } = {},
+  opts: { onlySlug?: string; dryRun?: boolean; log?: (s: string) => void; budgetMs?: number } = {},
 ): Promise<VenueResult[]> {
+  const started = Date.now();
   const log = opts.log ?? console.log;
 
   // "manual" venues hold hand-researched one-off events (npm run import:csv), not a
   // calendar page worth scraping every day.
   let query = supabase.from("venues").select("*").eq("active", true).neq("source", "manual");
   if (opts.onlySlug) query = query.eq("slug", opts.onlySlug);
+  // Longest since last tried first, so a run that stops at its time budget picks up where the
+  // last one left off instead of redoing the same venues.
+  query = query.order("last_ingested_at", { ascending: true, nullsFirst: true });
 
   const { data: venues, error } = await query;
   if (error) throw error;
@@ -220,11 +224,20 @@ export async function ingestAll(
 
   const results: VenueResult[] = [];
   for (const v of venues as Venue[]) {
+    if (opts.budgetMs && Date.now() - started > opts.budgetMs) {
+      log(`Time budget reached; ${venues.length - results.length} venue(s) wait for the next run.`);
+      break;
+    }
     try {
       results.push(await ingestVenue(v, log, { dryRun: opts.dryRun }));
     } catch (err) {
       log(`! ${v.name} failed: ${(err as Error).message}`);
       results.push({ venue: v.name, events: 0, occurrences: 0, skipped: "error" });
+    }
+    // Marked as tried even when the page was thin or failed, so it doesn't hold the front of
+    // the queue every day.
+    if (!opts.dryRun && results.at(-1)?.skipped) {
+      await supabase.from("venues").update({ last_ingested_at: new Date().toISOString() }).eq("id", v.id);
     }
   }
   return results;

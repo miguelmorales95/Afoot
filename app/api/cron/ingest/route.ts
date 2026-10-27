@@ -20,7 +20,9 @@ export async function GET(req: NextRequest) {
   }
 
   const logs: string[] = [];
-  const results = await ingestAll({ log: (s) => logs.push(s) });
+  // Stop starting new venues after 4 minutes so the run ends inside maxDuration; the rest go
+  // first next time.
+  const results = await ingestAll({ log: (s) => logs.push(s), budgetMs: 240_000 });
   const occurrences = results.reduce((n, r) => n + r.occurrences, 0);
 
   return NextResponse.json({ ok: true, venues: results.length, occurrences, results });
