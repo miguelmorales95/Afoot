@@ -130,6 +130,8 @@ export interface ReviewGroup {
   newsletter_url: string | null;
   neighborhood: string | null;
   city: string | null;
+  /** Street address from a discovered/seeded candidate, carried into the venue for geocoding. */
+  address?: string | null;
   sources: ReviewSource[];
   score: number | null; // best discovery confidence, if any
 }

@@ -101,7 +101,27 @@ export interface VenueResult {
   skipped?: string;
 }
 
-export async function ingestVenue(venue: Venue, log = console.log): Promise<VenueResult> {
+/** Print what the extractor found, in LA local time, so recurrence can be eyeballed. */
+function logPreview(events: ExtractedEvent[], log: (s: string) => void) {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles", weekday: "short", month: "short", day: "numeric",
+    hour: "numeric", minute: "2-digit",
+  });
+  for (const ev of events) {
+    const rule = ev.is_recurring ? ` [recurring: ${ev.recurrence_description ?? "no rule given"}]` : "";
+    log(`  • ${ev.title} (${ev.category}${ev.price ? `, ${ev.price}` : ""})${rule}`);
+    for (const o of ev.occurrences) {
+      const t = Date.parse(o.start);
+      log(`      ${Number.isNaN(t) ? `?? unparseable "${o.start}"` : fmt.format(t)}`);
+    }
+  }
+}
+
+export async function ingestVenue(
+  venue: Venue,
+  log = console.log,
+  opts: { dryRun?: boolean } = {},
+): Promise<VenueResult> {
   const url = venue.events_url || venue.website;
   if (!url) return { venue: venue.name, events: 0, occurrences: 0, skipped: "no URL" };
 
@@ -133,6 +153,13 @@ export async function ingestVenue(venue: Venue, log = console.log): Promise<Venu
   });
   log(`  extracted ${events.length} event(s)`);
 
+  if (opts.dryRun) {
+    // Preview only: nothing is written to the database.
+    logPreview(events, log);
+    const occ = events.reduce((n, e) => n + e.occurrences.length, 0);
+    return { venue: venue.name, events: events.length, occurrences: occ };
+  }
+
   const occurrenceCount = await storeExtractedEvents({
     venueId: venue.id,
     events,
@@ -151,7 +178,7 @@ export async function ingestVenue(venue: Venue, log = console.log): Promise<Venu
 }
 
 export async function ingestAll(
-  opts: { onlySlug?: string; log?: (s: string) => void } = {},
+  opts: { onlySlug?: string; dryRun?: boolean; log?: (s: string) => void } = {},
 ): Promise<VenueResult[]> {
   const log = opts.log ?? console.log;
 
@@ -170,7 +197,7 @@ export async function ingestAll(
   const results: VenueResult[] = [];
   for (const v of venues as Venue[]) {
     try {
-      results.push(await ingestVenue(v, log));
+      results.push(await ingestVenue(v, log, { dryRun: opts.dryRun }));
     } catch (err) {
       log(`! ${v.name} failed: ${(err as Error).message}`);
       results.push({ venue: v.name, events: 0, occurrences: 0, skipped: "error" });

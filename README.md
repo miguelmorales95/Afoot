@@ -205,6 +205,12 @@ npm run promote -- --auto 0.75    # approve + promote high-confidence finds
 Or approve by hand in the Supabase table UI (`candidate_venues.status = 'approved'`) and run
 `npm run promote`.
 
+Or start from a hand-picked list instead of (or before) the crawler: `data/la-venues.csv` holds
+40 small LA venues (bookstores, jazz and music rooms, comedy, breweries, galleries) with their
+public sites. `npm run seed:venues -- --dry-run` shows what it would add; `npm run seed:venues`
+puts the new ones in the review queue (`candidate_venues`), where `/admin` or
+`npm run promote -- --auto 0.9` turns them into venues. No AI or web requests involved.
+
 ### 5. Geocode + ingest
 
 ```bash
@@ -216,6 +222,13 @@ Ingest just one venue while testing:
 
 ```bash
 npm run ingest -- smog-city-torrance
+```
+
+Preview without writing anything (check recurring events expand to the right dates):
+
+```bash
+npm run ingest -- --dry-run smog-city-torrance             # one venue, printed in LA time
+npm run ingest -- --url https://example.com/events --name "Some Bar"   # any page, no DB row
 ```
 
 ### 6. Run

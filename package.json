@@ -12,6 +12,7 @@
     "geocode": "tsx scripts/geocode-venues.ts",
     "discover": "tsx scripts/discover.ts",
     "promote": "tsx scripts/promote.ts",
+    "seed:venues": "tsx scripts/seed-venues.ts",
     "newsletters": "tsx scripts/newsletters.ts",
     "newsletter:add": "tsx scripts/add-newsletter-source.ts",
     "geocode:csv": "tsx scripts/geocode-csv.ts",

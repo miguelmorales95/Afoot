@@ -30,7 +30,7 @@ export async function getReviewGroups(): Promise<ReviewGroup[]> {
 
   const { data: candidates } = await supabase
     .from("candidate_venues")
-    .select("id, venue_name, domain, url, events_url, newsletter_url, neighborhood, city, score, reason, created_at")
+    .select("id, venue_name, domain, url, events_url, newsletter_url, neighborhood, city, address, score, reason, created_at")
     .eq("status", "new");
 
   const groups = new Map<string, ReviewGroup>();
@@ -64,6 +64,7 @@ export async function getReviewGroups(): Promise<ReviewGroup[]> {
     g.newsletter_url = g.newsletter_url || c.newsletter_url || null;
     g.neighborhood = g.neighborhood || c.neighborhood || null;
     g.city = g.city || c.city || null;
+    g.address = g.address || c.address || null;
     if (typeof c.score === "number") g.score = Math.max(g.score ?? 0, c.score);
     g.sources.push({
       kind: "discovery",
@@ -127,6 +128,8 @@ export async function applyAction(input: ActionInput): Promise<{ ok: boolean; no
       website: group.website || `https://${group.domain}`,
       events_url: group.events_url || null,
       newsletter_url: group.newsletter_url || null,
+      // Only when known, so approving never blanks an address already on the venue.
+      ...(group.address ? { address: group.address } : {}),
       city: group.city || group.neighborhood || "Los Angeles",
       description: group.neighborhood ? `${group.neighborhood} — added from review queue.` : null,
       source: submissionIds.length ? "submission" : "sourced",
