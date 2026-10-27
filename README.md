@@ -310,8 +310,9 @@ phones fast), **cookieless, and do not track users**. Set the provider with
 - **`adsense`** — Google AdSense. It works, but it **tracks users** — only use it if you accept
   that. Set `NEXT_PUBLIC_ADSENSE_CLIENT` / `NEXT_PUBLIC_ADSENSE_SLOT_RAIL`.
 
-The site collects no accounts, sets no analytics, and only uses `localStorage` to remember your
-last location on your own device. That's the "Craigslist for events" stance: fast, open, and
+Browsing needs no account and sets no cookies; the full, plain-language list of what Afoot does
+collect (optional sign-in, feedback hashes, cookieless visit counts) is the privacy page at
+`/privacy` (`app/privacy/page.tsx`). Update it whenever a change alters what is collected. That's the "Craigslist for events" stance: fast, open, and
 light enough to work on an old phone.
 
 ## Sponsors

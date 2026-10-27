@@ -47,6 +47,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </a>
             .
           </p>
+          <p className="mt-3">
+            <Link href="/privacy" className="hover:text-white/70 hover:underline">
+              Privacy
+            </Link>
+            {" · "}No ad tracking, and we never sell your data.
+          </p>
         </footer>
       </body>
     </html>
