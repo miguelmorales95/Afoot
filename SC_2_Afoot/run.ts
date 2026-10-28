@@ -4,7 +4,7 @@
 //   npm run screenshots -- --publish   # publish straight away (skip the review)
 //   npm run screenshots -- --dry-run   # only print what it read; nothing saved or moved
 // A local vision model (Ollama, OLLAMA_VISION_MODEL, default gemma3:4b) reads each picture: free and
-// private, but slow without a graphics card (a few minutes a picture). Afterwards each screenshot moves
+// private; about 10–30 seconds a picture without a graphics card. Afterwards each screenshot moves
 // to processed/ (or needs-review/ when no date could be read), with what the model saw beside it.
 import "../scripts/env";
 import fs from "node:fs";

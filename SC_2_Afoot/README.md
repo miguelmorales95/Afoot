@@ -25,7 +25,8 @@ model's raw reading saved beside it as `.json`. These folders are never committe
 
 ## Good to know
 
-- **Speed:** on this computer (no graphics card) a screenshot takes a few minutes. Start it and walk away.
+- **Speed:** on this computer (no graphics card) a screenshot takes about 10–30 seconds; bigger batches can run
+  while you do something else.
 - **The model:** Google's `gemma3:4b` through Ollama (about 3.3 GB; `~/.local/ollama/bin/ollama pull gemma3:4b`).
   A larger one reads small text better: `OLLAMA_VISION_MODEL=gemma3:12b npm run screenshots` after downloading it
   (about 8 GB). Qwen's `qwen2.5vl` returned empty answers on this computer's Ollama (0.40.10), so it isn't the default.
