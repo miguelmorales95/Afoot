@@ -52,7 +52,7 @@ async function staleOccurrences(eventId: string, listed: number[]) {
 export async function storeExtractedEvents(opts: {
   venueId: string;
   events: ExtractedEvent[];
-  source: "website" | "newsletter" | "manual";
+  source: "website" | "newsletter" | "manual" | "link" | "eventbrite" | "ticketmaster";
   fallbackUrl?: string | null;
   log?: (s: string) => void;
 }): Promise<number> {

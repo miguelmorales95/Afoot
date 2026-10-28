@@ -187,6 +187,8 @@ Fill in:
 | `ANTHROPIC_API_KEY` | From console.anthropic.com |
 | `EXTRACTION_MODEL` | `claude-haiku-5-5` (bump to `claude-sonnet-5-5` for tougher pages) |
 | `NOMINATIM_EMAIL` | Your email (Nominatim's usage policy requires a contact) |
+| `TICKETMASTER_API_KEY` | Optional. Free Discovery API key (developer.ticketmaster.com): reads Ticketmaster links and venue feeds |
+| `EVENTBRITE_TOKEN` | Optional. Eventbrite private token (eventbrite.com → Account settings → Developer links → API keys): organizer feeds. Eventbrite links read fine without it |
 | `CRON_SECRET` | A long random string (`openssl rand -hex 32`). **Required:** without it the scheduled ingest route refuses to run |
 | `OLLAMA_NUM_CTX` | Local model's context window (default 16384); Ollama's own default drops most of a long page |
 | `OLLAMA_TIMEOUT_MS` | How long to wait for the local model per page (default 120000). On a machine without a GPU a long page can take over 5 minutes, which hits Node's own request limit: use Anthropic for bulk ingests there |
@@ -232,6 +234,22 @@ Preview without writing anything (check recurring events expand to the right dat
 npm run ingest -- --dry-run smog-city-torrance             # one venue, printed in LA time
 npm run ingest -- --url https://example.com/events --name "Some Bar"   # any page, no DB row
 ```
+
+### 5b. Events from links and other apps
+
+- **Anyone can paste an event link on `/submit`** ("Add an event"): Facebook, Eventbrite, Ticketmaster,
+  Meetup or a venue's page. The server reads the event (the official API when a key is set, otherwise the
+  event data pages carry for search engines, then the AI as a last resort) and it waits in `/admin` under
+  *Event links*, editable, until someone publishes or rejects it. Facebook usually hides events from
+  visitors who aren't signed in, so the form also asks for the name, date and place. Afoot never signs in
+  to Facebook or uses accounts to scrape it.
+- **Feeds** (`/admin` → *Event feeds*): an Eventbrite organizer (its `eventbrite.com/o/...` page) or a
+  Ticketmaster venue (`npm run ticketmaster:venues -- "Lodge Room"` finds its id). `npm run feeds` pulls
+  their upcoming events daily in the GitHub Actions job.
+- Events from links and feeds go to a matching venue (same name, or within ~60 m) or a new one, which
+  starts paused for scraping. Public links are fetched only from public addresses (`lib/safeFetch.ts`).
+- Tables: `event_links`, `event_feeds` (migration `20261029010000`; apply with `npm run migrate -- <file>`
+  after `npm run backup:db`).
 
 ### 6. Run
 

@@ -19,7 +19,10 @@
     "import:csv": "tsx scripts/import-csv.ts",
     "recheck": "tsx scripts/recheck.ts",
     "backup:db": "tsx scripts/backup-db.ts",
-    "ads:report": "tsx scripts/ads-report.ts"
+    "ads:report": "tsx scripts/ads-report.ts",
+    "feeds": "tsx scripts/feeds.ts",
+    "ticketmaster:venues": "tsx scripts/ticketmaster-venues.ts",
+    "migrate": "tsx scripts/migrate.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.65.0",

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import type { ReviewGroup } from "@/lib/types";
 import FlagQueue from "@/components/FlagQueue";
+import EventLinkQueue from "@/components/EventLinkQueue";
 import SponsorAdmin from "@/components/SponsorAdmin";
 
 const TOKEN_KEY = "afoot_admin_token";
@@ -111,6 +112,8 @@ export default function AdminPage() {
           Demo mode — sample data. Approving/rejecting won&apos;t save anything.
         </p>
       )}
+
+      {!loading && !demo && <EventLinkQueue />}
 
       {!loading && !demo && <FlagQueue />}
 

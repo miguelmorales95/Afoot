@@ -620,3 +620,36 @@ grant all on afoot.sponsors, afoot.campaigns, afoot.campaign_daily to service_ro
 -- Functions are executable by PUBLIC by default; counting is server-only.
 revoke execute on function afoot.bump_campaign(uuid, int, int) from public, anon, authenticated;
 grant execute on function afoot.bump_campaign(uuid, int, int) to service_role;
+
+-- ---------------------------------------------------------------------------
+-- Event links and feeds (migration 20261029010000_event_links_and_feeds.sql)
+-- ---------------------------------------------------------------------------
+create table if not exists afoot.event_links (
+  id              uuid primary key default gen_random_uuid(),
+  url             text not null,
+  source          text not null default 'other',  -- facebook | eventbrite | ticketmaster | meetup | other
+  status          text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  extracted       jsonb,           -- { title, description, starts_at, ends_at, venue_name, address, lat, lng, price, category }
+  read_error      text,            -- why the page couldn't be read (the submitter's own details are used then)
+  note            text,
+  submitter_email text,
+  event_id        uuid references afoot.events(id) on delete set null,
+  created_at      timestamptz default now()
+);
+create index if not exists idx_event_links_status on afoot.event_links(status, created_at);
+alter table afoot.event_links enable row level security;
+
+create table if not exists afoot.event_feeds (
+  id          uuid primary key default gen_random_uuid(),
+  kind        text not null check (kind in ('eventbrite_organizer', 'ticketmaster_venue')),
+  ref         text not null,       -- the organizer or venue id at that service
+  label       text,
+  active      boolean not null default true,
+  last_run_at timestamptz,
+  last_result text,
+  created_at  timestamptz default now(),
+  unique (kind, ref)
+);
+alter table afoot.event_feeds enable row level security;
+
+grant all on afoot.event_links, afoot.event_feeds to service_role;
