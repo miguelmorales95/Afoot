@@ -21,7 +21,9 @@ function toLocalInput(iso?: string | null) {
 
 function LinkCard({ link, onDone, headers }: { link: Link; onDone: () => void; headers: Record<string, string> }) {
   const x = link.extracted ?? {};
+  const fromScreenshot = link.url.startsWith("screenshot:");
   const [d, setD] = useState({
+    link: fromScreenshot ? (x.url ?? "") : link.url,
     title: x.title ?? "", starts: toLocalInput(x.starts_at), ends: toLocalInput(x.ends_at), venue_name: x.venue_name ?? "",
     address: x.address ?? "", price: x.price ?? "", category: x.category ?? "other", description: x.description ?? "",
   });
@@ -34,7 +36,7 @@ function LinkCard({ link, onDone, headers }: { link: Link; onDone: () => void; h
     // Times are typed in LA time, whatever the admin's own time zone.
     const iso = (local: string) => (local ? new Date(`${local}:00${laOffset(local)}`).toISOString() : null);
     const details = { ...x, title: d.title, description: d.description || null, starts_at: iso(d.starts), ends_at: iso(d.ends), venue_name: d.venue_name || null,
-      address: d.address || null, price: d.price || null, category: d.category, url: x.url || link.url };
+      address: d.address || null, price: d.price || null, category: d.category, url: d.link.trim() || null };
     const res = await fetch("/api/admin/links", { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify({ id: link.id, action, details }) });
     const body = await res.json().catch(() => ({}));
     setBusy(false);
@@ -46,12 +48,15 @@ function LinkCard({ link, onDone, headers }: { link: Link; onDone: () => void; h
     <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <span className="rounded-full bg-fuchsia-500/15 px-2 py-0.5 text-fuchsia-200">{link.source}</span>
-        <a href={link.url} target="_blank" rel="noreferrer noopener" className="truncate text-white/50 underline">{link.url}</a>
+        {fromScreenshot
+          ? <span className="truncate text-white/50">{link.note ?? "From a screenshot"}</span>
+          : <a href={link.url} target="_blank" rel="noreferrer noopener" className="truncate text-white/50 underline">{link.url}</a>}
       </div>
       {link.read_error && <p className="mt-2 text-xs text-amber-300">Couldn&apos;t read the page: {link.read_error}. Check the details against the link.</p>}
       {link.note && <p className="mt-2 text-sm text-white/60">“{link.note}”</p>}
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         <label className="text-xs text-white/50 sm:col-span-2">Title<input className={input} value={d.title} onChange={set("title")} /></label>
+        <label className="text-xs text-white/50 sm:col-span-2">Link people tap for details<input className={input} value={d.link} onChange={set("link")} placeholder="https://www.facebook.com/events/..." /></label>
         <label className="text-xs text-white/50">Starts (LA time)<input type="datetime-local" className={input} value={d.starts} onChange={set("starts")} /></label>
         <label className="text-xs text-white/50">Ends<input type="datetime-local" className={input} value={d.ends} onChange={set("ends")} /></label>
         <label className="text-xs text-white/50">Venue<input className={input} value={d.venue_name} onChange={set("venue_name")} /></label>

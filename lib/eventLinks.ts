@@ -41,11 +41,14 @@ export async function approveEventLink(id: string, d: LinkDetails) {
   if (!d.title?.trim() || !d.starts_at || Number.isNaN(Date.parse(d.starts_at))) throw new Error("A title and a start time are needed");
   const venueId = await venueFor({ name: d.venue_name ?? null, address: d.address ?? null, lat: d.lat ?? null, lng: d.lng ?? null, source: "link" });
   const source = link.source === "eventbrite" || link.source === "ticketmaster" ? link.source : "link";
+  // A screenshot without a readable link has a placeholder address; that never becomes the event's link.
+  const pageUrl = link.url.startsWith("screenshot:") ? null : link.url;
+  const url = d.url && /^https?:\/\//.test(d.url) ? d.url : pageUrl;
   await storeExtractedEvents({
-    venueId, source, fallbackUrl: link.url,
+    venueId, source, fallbackUrl: url,
     events: [{
       title: d.title.trim(), description: d.description ?? null, category: CATS.includes(d.category as EventCategory) ? d.category as EventCategory : "other",
-      price: d.price ?? null, url: d.url || link.url, recurrence_description: null, is_recurring: false, tags: [],
+      price: d.price ?? null, url, recurrence_description: null, is_recurring: false, tags: [],
       occurrences: [{ start: new Date(d.starts_at).toISOString(), end: d.ends_at && !Number.isNaN(Date.parse(d.ends_at)) ? new Date(d.ends_at).toISOString() : null }],
     }],
   });

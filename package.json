@@ -22,7 +22,8 @@
     "ads:report": "tsx scripts/ads-report.ts",
     "feeds": "tsx scripts/feeds.ts",
     "ticketmaster:venues": "tsx scripts/ticketmaster-venues.ts",
-    "migrate": "tsx scripts/migrate.ts"
+    "migrate": "tsx scripts/migrate.ts",
+    "screenshots": "tsx SC_2_Afoot/run.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.65.0",

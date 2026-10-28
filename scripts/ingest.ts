@@ -39,6 +39,12 @@ async function main() {
   for (const r of results) {
     if (r.skipped) console.log(`  · ${r.venue}: skipped (${r.skipped})`);
   }
+  // Every venue erroring means something is wrong for all of them (a bad AI key, the database):
+  // fail the run so GitHub Actions marks it red and emails, instead of quietly importing nothing.
+  if (results.length > 1 && results.every((r) => r.skipped === "error")) {
+    console.error("\nEvery venue failed: check the errors above (often ANTHROPIC_API_KEY).");
+    process.exitCode = 1;
+  }
 }
 
-main().then(() => process.exit(0));
+main().then(() => process.exit(process.exitCode ?? 0));

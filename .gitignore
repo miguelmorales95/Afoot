@@ -34,3 +34,9 @@ yarn-error.log*
 
 # sponsor reports (npm run ads:report): business contacts and numbers, keep local
 /reports/
+
+# SC_2_Afoot: screenshots stay on this computer
+SC_2_Afoot/screenshots/*
+!SC_2_Afoot/screenshots/.gitkeep
+SC_2_Afoot/processed/
+SC_2_Afoot/needs-review/
