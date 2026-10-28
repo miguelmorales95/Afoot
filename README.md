@@ -247,9 +247,12 @@ Search a neighborhood (e.g. *Torrance*) or click **use my current location**.
 
 1. Push to GitHub, import the repo in Vercel.
 2. Add all the env vars from `.env.local` in the Vercel project settings.
-3. `vercel.json` already registers a daily cron (`9:00 UTC`) hitting `/api/cron/ingest`,
-   which re-runs ingestion for active venues, longest since last tried first, for up to 4 minutes
-   (the rest go first the next day). Adjust the schedule there.
+3. The daily import runs on **GitHub Actions** (`.github/workflows/ingest.yml`, 9:00 UTC), not on
+   Vercel: Vercel's functions can't run the headless browser some calendars need and stop after
+   5 minutes. Add the repository secrets `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` and
+   `ANTHROPIC_API_KEY` (Settings → Secrets and variables → Actions); run it by hand from the Actions
+   tab. `/api/cron/ingest` (with `CRON_SECRET`) remains for a one-off run on Vercel, for up to
+   4 minutes, longest-waiting venues first.
 4. Re-ingesting never deletes a date anyone RSVP'd to or chatted about: if the venue drops it,
    it's marked cancelled instead. Other dates the page no longer lists are removed.
 

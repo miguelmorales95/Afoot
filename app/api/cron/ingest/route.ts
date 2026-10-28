@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ingestAll } from "@/lib/ingest";
 
-// Scheduled ingestion. Wired to Vercel Cron via vercel.json.
+// Ingestion over HTTP, for a manual run from Vercel. The daily import runs on GitHub Actions
+// (.github/workflows/ingest.yml), which can use a real browser and isn't cut off at 5 minutes.
 // Protected by CRON_SECRET so randoms can't trigger paid LLM runs.
 //
 // Vercel sends `Authorization: Bearer <CRON_SECRET>` automatically for crons.
