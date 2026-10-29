@@ -4,8 +4,8 @@
 //   npm run screenshots -- --publish   # publish straight away (skip the review)
 //   npm run screenshots -- --dry-run   # only print what it read; nothing saved or moved
 // A local vision model (Ollama, OLLAMA_VISION_MODEL, default gemma3:4b) reads each picture: free and
-// private; about 10–30 seconds a picture without a graphics card. Afterwards each screenshot moves
-// to processed/ (or needs-review/ when no date could be read), with what the model saw beside it.
+// private; about 10–30 seconds a picture without a graphics card. A screenshot whose events were saved
+// is deleted; one where no date could be read moves to needs-review/, with what the model saw beside it.
 import "../scripts/env";
 import fs from "node:fs";
 import path from "node:path";
@@ -14,9 +14,9 @@ import { approveEventLink } from "../lib/eventLinks";
 import { laLocalToIso, linkSource, type LinkDetails } from "../lib/eventLink";
 import type { EventCategory } from "../lib/types";
 
-const DIR = path.join(process.cwd(), "SC_2_Afoot");
+// Folders sit beside this script, wherever the terminal was opened.
+const DIR = import.meta.dirname;
 const IN = path.join(DIR, "screenshots");
-const DONE = path.join(DIR, "processed");
 const REVIEW = path.join(DIR, "needs-review");
 const OLLAMA = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
 const MODEL = process.env.OLLAMA_VISION_MODEL || "gemma3:4b";
@@ -116,7 +116,7 @@ async function alreadyHave(link: string | null, title: string, starts: string) {
 }
 
 async function main() {
-  for (const d of [IN, DONE, REVIEW]) fs.mkdirSync(d, { recursive: true });
+  for (const d of [IN, REVIEW]) fs.mkdirSync(d, { recursive: true });
   const files = fs.readdirSync(IN).filter((f) => /\.(png|jpe?g|webp)$/i.test(f))
     .sort((a, b) => fs.statSync(path.join(IN, a)).mtimeMs - fs.statSync(path.join(IN, b)).mtimeMs);
   if (!files.length) return console.log(`No screenshots in ${IN}. Add some (png, jpg or webp) and run again.`);
@@ -163,9 +163,13 @@ async function main() {
     }
     console.log(`  (${Math.round((Date.now() - started) / 1000)} s)`);
     if (!DRY) {
-      const dest = usable ? DONE : REVIEW;
-      fs.renameSync(full, path.join(dest, file));
-      fs.writeFileSync(path.join(dest, `${file}.json`), raw || "{}");
+      // Done with it: the events are saved (or were already there), so the screenshot goes. One the
+      // AI couldn't read a date from waits in needs-review/ with what it saw.
+      if (usable) fs.unlinkSync(full);
+      else {
+        fs.renameSync(full, path.join(REVIEW, file));
+        fs.writeFileSync(path.join(REVIEW, `${file}.json`), raw || "{}");
+      }
     }
   }
   console.log(`\nDone. ${added} event(s) ${PUBLISH ? "published" : "waiting in /admin → Event links"}.`);

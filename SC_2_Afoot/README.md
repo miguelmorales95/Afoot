@@ -20,8 +20,9 @@ events themselves.
 
 4. Open `/admin` → **Event links**: each event shows what the AI read. Fix anything, then Publish.
 
-Each screenshot then moves to `processed/` (or `needs-review/` if no date could be read), with the
-model's raw reading saved beside it as `.json`. These folders are never committed to git.
+Each screenshot whose events were saved is then **deleted**. One where no date could be read moves to
+`needs-review/` with the model's raw reading beside it as `.json`; look at it, add the event by hand on
+/submit if you like, and delete it. These folders are never committed to git.
 
 ## Good to know
 
