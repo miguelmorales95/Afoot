@@ -3,7 +3,8 @@
 //   npm run sources:import -- --dry-run                 # print what would be added (reads only)
 //   npm run sources:import                              # every data/sources/*.csv
 //   npm run sources:import -- data/sources/colleges.csv
-// A row with a verified feed (feed_verified = yes) becomes an event feed: Localist API or iCal,
+// A row with a verified feed (feed_verified = yes) becomes an event feed: Localist API, iCal,
+// CivicPlus calendar RSS or Communico library JSON,
 // with the institution as the venue for events without their own map pin. A row with only a
 // calendar page goes to the /admin review queue, where approving it lets the daily ingest read
 // that page with the AI. Rows already known (same feed, or same site) are skipped.
@@ -19,11 +20,13 @@ import { venueFor } from "../lib/venueMatch";
 
 const DIR = "data/sources";
 
-function feedOf(r: Record<string, string>): { kind: "ics" | "localist"; ref: string } | null {
+function feedOf(r: Record<string, string>): { kind: "ics" | "localist" | "civicplus" | "communico"; ref: string } | null {
   let url = (r.feed_url || "").trim();
   if (!url || !/^yes$/i.test(r.feed_verified || "")) return null;
   // Trumba publishes every calendar as both RSS and iCal: take the iCal one.
   if (/trumba\.com\/calendars\/[^/?]+\.rss/i.test(url)) url = url.replace(/\.rss\b/i, ".ics");
+  if (/RSSFeed\.aspx\?ModID=58/i.test(url)) return { kind: "civicplus", ref: url };
+  if (/\.libnet\.info\b/i.test(url)) return { kind: "communico", ref: new URL(url).origin };
   if (/\.rss\b|\/rss|\/feed\/?$|RSSFeed|wp-json|json/i.test(url)) return null;
   if (/localist/i.test(r.platform) && /\/api\/2\/events/.test(url)) return { kind: "localist", ref: url.replace(/\?.*$/, "") };
   if (/\.ics\b|ical|webcal:|format=ical|text\/calendar|\/ics\b|icalendar/i.test(url) || /ics|trumba|livewhale|libcal|google/i.test(r.platform)) return { kind: "ics", ref: url };

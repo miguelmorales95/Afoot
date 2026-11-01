@@ -3,8 +3,9 @@ import { adminAuthed } from "@/lib/adminAuth";
 import { supabase } from "@/lib/supabase";
 import { eventbriteOrganizerId } from "@/lib/eventApis";
 import { venueFor } from "@/lib/venueMatch";
+import { CALENDAR_KINDS } from "@/lib/feeds";
 
-// Event feeds (Eventbrite organizers, Ticketmaster venues, iCal and Localist calendars), pulled
+// Event feeds (Eventbrite organizers, Ticketmaster venues, iCal, Localist, CivicPlus and Communico calendars), pulled
 // daily by `npm run feeds`.
 //   GET                              -> { feeds, keys: { ticketmaster, eventbrite } }
 //   POST { kind, ref, label?, venue?, address? } -> adds one (an Eventbrite organizer link or id; a
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest) {
   if (!adminAuthed(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const b = await req.json().catch(() => ({}));
   const raw = String(b.ref ?? "").trim();
-  const calendar = b.kind === "ics" || b.kind === "localist";
+  const calendar = CALENDAR_KINDS.has(b.kind);
   const ref = b.kind === "eventbrite_organizer" ? eventbriteOrganizerId(raw)
     : b.kind === "ticketmaster_venue" && /^[A-Za-z0-9]{6,24}$/.test(raw) ? raw
     : calendar && /^(https?|webcal):\/\/\S+$/i.test(raw) ? raw : null;

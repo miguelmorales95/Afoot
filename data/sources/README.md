@@ -8,7 +8,7 @@ one, and how far along it is. Update it whenever a source type is added or swept
 
 | Method | What it is | Code |
 |---|---|---|
-| **Calendar feed** | An official iCal or Localist feed. No AI, exact times, no page-layout breakage. Always prefer this. | `lib/calendarFeeds.ts`, `event_feeds` (kind `ics` / `localist`) |
+| **Calendar feed** | An official iCal, Localist, CivicPlus (city calendar RSS) or Communico (library) feed. No AI, exact times, no page-layout breakage. Always prefer this. | `lib/calendarFeeds.ts`, `event_feeds` (kind `ics` / `localist` / `civicplus` / `communico`) |
 | **Ticketing API** | Ticketmaster venues and Eventbrite organizers, through their official APIs | `lib/eventApis.ts`, `event_feeds` |
 | **Newsletter** | The venue's mailing list, sent to Afoot's inbox and read by AI | `lib/newsletter.ts`, /admin → Newsletters |
 | **Calendar page** | The venue's events page, read by AI each night (headless browser when needed) | `lib/ingest.ts`, `venues.events_url` |
@@ -103,9 +103,13 @@ After importing, venues the geocoder couldn't place were given their street addr
 gardens, 9 malls, 13 civic). 21 have a working feed; 7 of them are iCal and become feeds on import (Long Beach
 libraries alone list ~200 events in 60 days). The rest go to the review queue as calendar pages.
 
-- **RSS and JSON feeds not read yet:** 10 cities' CivicPlus calendars (RSS, mixed with meetings), Glendale
-  library (Communico JSON), Beaches & Harbors (WordPress EventON), Arboretum and Hammer (RSS). A small RSS
-  reader would add them.
+- **CivicPlus and Communico, 2026-11-01:** the 10 cities' CivicPlus calendars and Glendale's libraries
+  (Communico) are now read as feeds (~400 dates; council and commission meetings filtered out). Their
+  venues' `events_url` was cleared so the AI doesn't read the same calendar twice. Inglewood's feed is empty
+  for now. Other Communico libraries (`*.libnet.info`) can be added from /admin → feeds.
+- **Read by the AI as calendar pages instead:** Beaches & Harbors (EventON keeps dates out of its JSON),
+  Arboretum and Hammer (their RSS has dates only in the text).
+- **All 82 calendar pages from both lists were approved on 2026-11-01** and given street addresses.
 - **Sites that block scripted reading** (403/429): LA City Rec & Parks, Burbank, Santa Clarita, Huntington,
   Descanso, LA Zoo, California Science Center, Music Center, Craft Contemporary, Forest Lawn, CityWalk, Carson.
   The nightly headless browser may get through; otherwise newsletters or Ticketmaster.

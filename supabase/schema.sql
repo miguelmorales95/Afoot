@@ -720,3 +720,8 @@ alter table afoot.event_feeds add constraint event_feeds_kind_check
 alter table afoot.event_feeds add column if not exists venue_id uuid references afoot.venues(id) on delete set null;
 alter table afoot.event_feeds add column if not exists source_type text;
 alter table afoot.event_feeds add column if not exists options jsonb not null default '{}'::jsonb;
+
+-- More calendar kinds (migrations/20261101000000_more_calendar_feeds.sql)
+alter table afoot.event_feeds drop constraint if exists event_feeds_kind_check;
+alter table afoot.event_feeds add constraint event_feeds_kind_check
+  check (kind in ('eventbrite_organizer', 'ticketmaster_venue', 'ics', 'localist', 'civicplus', 'communico'));

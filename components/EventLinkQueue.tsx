@@ -92,6 +92,7 @@ function Feeds({ headers }: { headers: Record<string, string> }) {
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [keys, setKeys] = useState<{ ticketmaster: boolean; eventbrite: boolean } | null>(null);
   const [kind, setKind] = useState("eventbrite_organizer");
+  const calendar = ["ics", "localist", "civicplus", "communico"].includes(kind);
   const [ref, setRef] = useState("");
   const [label, setLabel] = useState("");
   const [venue, setVenue] = useState("");
@@ -125,11 +126,13 @@ function Feeds({ headers }: { headers: Record<string, string> }) {
           <option value="ticketmaster_venue">Ticketmaster venue</option>
           <option value="ics">Calendar (iCal URL)</option>
           <option value="localist">Calendar (Localist)</option>
+          <option value="civicplus">Calendar (CivicPlus city RSS)</option>
+          <option value="communico">Calendar (Communico library)</option>
         </select>
         <input className={`${input} min-w-64 flex-1`} value={ref} onChange={(e) => setRef(e.target.value)}
-          placeholder={kind === "eventbrite_organizer" ? "https://www.eventbrite.com/o/name-12345678" : kind === "ticketmaster_venue" ? "Ticketmaster venue id (npm run ticketmaster:venues)" : kind === "ics" ? "https://…/calendar.ics" : "https://calendar.example.edu"} />
-        <input className={input} value={label} onChange={(e) => setLabel(e.target.value)} placeholder={kind === "ics" || kind === "localist" ? "Short name, e.g. UCLA" : "Name (optional)"} />
-        {(kind === "ics" || kind === "localist") && (
+          placeholder={kind === "eventbrite_organizer" ? "https://www.eventbrite.com/o/name-12345678" : kind === "ticketmaster_venue" ? "Ticketmaster venue id (npm run ticketmaster:venues)" : kind === "ics" ? "https://…/calendar.ics" : kind === "civicplus" ? "https://city.gov/RSSFeed.aspx?ModID=58&CID=All-calendar.xml" : kind === "communico" ? "https://library.libnet.info" : "https://calendar.example.edu"} />
+        <input className={input} value={label} onChange={(e) => setLabel(e.target.value)} placeholder={calendar ? "Short name, e.g. UCLA" : "Name (optional)"} />
+        {calendar && (
           <>
             <input className={input} value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="Venue for unplaced events (e.g. UCLA campus)" />
             <input className={input} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Its address" />
@@ -141,7 +144,7 @@ function Feeds({ headers }: { headers: Record<string, string> }) {
       <div className="mt-3 space-y-2">
         {feeds.map((f) => (
           <div key={f.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-white/10 px-3 py-2 text-sm">
-            <span className="rounded-full bg-white/5 px-2 py-0.5 text-[11px]">{({ eventbrite_organizer: "Eventbrite", ticketmaster_venue: "Ticketmaster", ics: "iCal", localist: "Localist" } as Record<string, string>)[f.kind] ?? f.kind}</span>
+            <span className="rounded-full bg-white/5 px-2 py-0.5 text-[11px]">{({ eventbrite_organizer: "Eventbrite", ticketmaster_venue: "Ticketmaster", ics: "iCal", localist: "Localist", civicplus: "CivicPlus", communico: "Communico" } as Record<string, string>)[f.kind] ?? f.kind}</span>
             <b>{f.label || f.ref}</b>
             <span className="text-white/40">{f.last_run_at ? `${new Date(f.last_run_at).toLocaleDateString()}: ${f.last_result}` : "not run yet"}</span>
             <span className="flex-1" />
