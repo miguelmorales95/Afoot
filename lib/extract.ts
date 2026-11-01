@@ -80,7 +80,7 @@ export async function extractEvents(
   const text = await complete({
     system: SYSTEM,
     prompt: userContent,
-    maxTokens: 8000,
+    maxTokens: 16000,
     json: true,
   });
 
@@ -88,8 +88,14 @@ export async function extractEvents(
   try {
     parsed = JSON.parse(extractJson(text));
   } catch {
-    console.error(`  could not parse model output for ${input.venueName}`);
-    return [];
+    // A busy calendar can run past the output limit: keep the events that came through whole.
+    const salvaged = completeEvents(text);
+    if (!salvaged.length) {
+      console.error(`  could not parse model output for ${input.venueName}`);
+      return [];
+    }
+    console.error(`  model output for ${input.venueName} was cut off: kept ${salvaged.length} complete event(s)`);
+    parsed = { events: salvaged };
   }
 
   const events = Array.isArray(parsed.events) ? parsed.events : [];
@@ -113,4 +119,29 @@ export async function extractEvents(
             .slice(0, 6)
         : [],
     }));
+}
+
+/** The whole event objects in an "events" array whose JSON was cut off partway. */
+export function completeEvents(text: string): ExtractedEvent[] {
+  const key = text.indexOf('"events"');
+  const open = key === -1 ? -1 : text.indexOf("[", key);
+  if (open === -1) return [];
+  const out: ExtractedEvent[] = [];
+  let depth = 0, start = -1, inString = false, escaped = false;
+  for (let i = open + 1; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === "{") { if (depth++ === 0) start = i; }
+    else if (ch === "}" && --depth === 0 && start !== -1) {
+      try { out.push(JSON.parse(text.slice(start, i + 1))); } catch { /* skip a malformed one */ }
+      start = -1;
+    } else if (ch === "]" && depth === 0) break;
+  }
+  return out;
 }
