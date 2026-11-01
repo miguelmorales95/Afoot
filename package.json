@@ -23,7 +23,8 @@
     "feeds": "tsx scripts/feeds.ts",
     "ticketmaster:venues": "tsx scripts/ticketmaster-venues.ts",
     "migrate": "tsx scripts/migrate.ts",
-    "screenshots": "tsx SC_2_Afoot/run.ts"
+    "screenshots": "tsx SC_2_Afoot/run.ts",
+    "sources:import": "tsx scripts/import-sources.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.65.0",
@@ -34,9 +35,11 @@
     "mailparser": "^3.7.1",
     "maplibre-gl": "^5.24.0",
     "next": "^15.1.6",
+    "node-ical": "^0.27.3",
     "pbf": "^5.1.2",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "stripe": "^23.1.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",

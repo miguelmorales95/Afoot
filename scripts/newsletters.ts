@@ -3,6 +3,7 @@
 //
 //   npm run newsletters            # one pass over unread mail
 //   npm run newsletters -- --loop  # keep polling every 5 minutes
+//   npm run newsletters -- --queue # read emails the webhook saved (the daily GitHub Actions job)
 //
 // No domain or webhook needed — just an inbox (Gmail with an app password,
 // Fastmail, etc.). Set IMAP_* in .env.local. Processed mail is marked read.
@@ -11,7 +12,7 @@ import "./env";
 
 import { ImapFlow } from "imapflow";
 import { simpleParser } from "mailparser";
-import { processInboundEmail, type InboundEmail } from "../lib/newsletter";
+import { processInboundEmail, processQueuedEmails, type InboundEmail } from "../lib/newsletter";
 
 function requireEnv(name: string): string {
   const v = process.env[name];
@@ -79,6 +80,11 @@ async function pass(): Promise<number> {
 }
 
 async function main() {
+  if (process.argv.includes("--queue")) {
+    const result = await processQueuedEmails();
+    console.log("Queue done:", JSON.stringify(result));
+    return;
+  }
   const loop = process.argv.includes("--loop");
   do {
     try {

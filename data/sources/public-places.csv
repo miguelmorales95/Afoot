@@ -1,0 +1,100 @@
+name,type,city,website,calendar_url,platform,feed_url,feed_verified,public_events,notes
+City of LA Recreation and Parks,parks-rec,Los Angeles,https://www.laparks.org,https://www.laparks.org/events,html,,no,yes,Site returns 403 to scripted fetches; calendar not machine-readable from here
+LA County Parks & Recreation,parks-rec,Los Angeles County,https://parks.lacounty.gov,https://parks.lacounty.gov/events/,EventON (WordPress),,no,yes,"EventON plugin; /feed/ is blog posts only, /events/?ical=1 and ajde_events REST not usable"
+LA County Beaches & Harbors,parks-rec,Los Angeles County,https://beaches.lacounty.gov,https://beaches.lacounty.gov/events/,EventON (WordPress),https://beaches.lacounty.gov/wp-json/wp/v2/ajde_events?per_page=100,yes,yes,"WP REST JSON of EventON events (ajde_events); event date fields are in post meta, may need per-event page parse"
+"Long Beach Parks, Recreation and Marine",parks-rec,Long Beach,https://www.longbeach.gov/park/,https://www.longbeach.gov/park/events/,Trumba,https://www.trumba.com/calendars/parks-recreation-and-marine.ics,yes,yes,Trumba webName parks-recreation-and-marine; also .rss
+City of Santa Monica events calendar,parks-rec,Santa Monica,https://www.santamonica.gov,https://www.santamonica.gov/events,CivicPlus/OpenCities?,,no,mixed,Calendar page loads; CivicPlus RSS/iCal paths returned no events
+City of Pasadena events (Dept of Parks/Community),parks-rec,Pasadena,https://www.cityofpasadena.net,https://www.cityofpasadena.net/events/,WordPress The Events Calendar,https://www.cityofpasadena.net/events/?ical=1,yes,mixed,Also Tribe REST /wp-json/tribe/events/v1/events works
+City of Glendale Community Services & Parks,parks-rec,Glendale,https://www.glendaleca.gov,,html,,no,mixed,Calendar URL not confirmed
+City of Burbank Parks & Recreation,parks-rec,Burbank,https://www.burbankca.gov,https://www.burbankca.gov/calendar,html,,no,mixed,Site returns 403 to scripted fetches
+City of Culver City Parks & Recreation,parks-rec,Culver City,https://www.culvercity.gov,,html,,no,mixed,Granicus OpenCities site; calendar URL not confirmed
+City of Torrance Community Services,parks-rec,Torrance,https://www.torranceca.gov,https://www.torranceca.gov/calendar,html,,no,mixed,No feed found
+City of Inglewood calendar,parks-rec,Inglewood,https://www.cityofinglewood.org,https://www.cityofinglewood.org/Calendar.aspx,CivicPlus,https://www.cityofinglewood.org/RSSFeed.aspx?ModID=58&CID=All-calendar.xml,yes,mixed,CivicPlus RSS; few events; includes city closures/meetings
+City of West Hollywood events,parks-rec,West Hollywood,https://www.weho.org,,html,,no,yes,Calendar URL not confirmed
+City of Beverly Hills calendar,parks-rec,Beverly Hills,https://www.beverlyhills.org,https://www.beverlyhills.org/calendar,CivicPlus,https://www.beverlyhills.org/RSSFeed.aspx?ModID=58&CID=All-calendar.xml,yes,mixed,"CivicPlus RSS, includes farmers market and community events"
+City of Manhattan Beach,parks-rec,Manhattan Beach,https://www.citymb.info,,html,,no,mixed,Calendar URL not confirmed
+City of Redondo Beach,parks-rec,Redondo Beach,https://www.redondo.org,,html,,no,mixed,Calendar URL not confirmed
+City of Hermosa Beach calendar,parks-rec,Hermosa Beach,https://www.hermosabeach.gov,https://www.hermosabeach.gov/calendar,html,,no,mixed,RSS path returned 403
+City of El Segundo,parks-rec,El Segundo,https://www.elsegundo.org,,html,,no,mixed,Calendar URL not confirmed
+City of Lancaster,parks-rec,Lancaster,https://www.cityoflancasterca.org,,html,,no,mixed,Calendar URL not confirmed
+City of Palmdale calendar,parks-rec,Palmdale,https://www.cityofpalmdaleca.gov,https://www.cityofpalmdaleca.gov/Calendar.aspx,CivicPlus,https://www.cityofpalmdale.org/RSSFeed.aspx?ModID=58&CID=All-calendar.xml,yes,mixed,CivicPlus RSS; domain redirects to cityofpalmdaleca.gov
+City of Santa Clarita,parks-rec,Santa Clarita,https://www.santa-clarita.com,,html,,no,mixed,Site returns 403 to scripted fetches
+City of Pomona,parks-rec,Pomona,https://www.pomonaca.gov,,html,,no,mixed,Calendar URL not confirmed
+City of Downey,parks-rec,Downey,https://www.downeyca.org,,html,,no,mixed,Calendar URL not confirmed
+City of Whittier calendar,parks-rec,Whittier,https://www.cityofwhittier.org,https://www.cityofwhittier.org/calendar,html,,no,mixed,No feed found
+City of Carson,parks-rec,Carson,https://www.carson.ca.us,,html,,no,mixed,Site timed out; website not confirmed by fetch (0)
+City of Compton,parks-rec,Compton,https://www.comptoncity.org,,html,,no,mixed,Calendar URL not confirmed
+City of South Gate,parks-rec,South Gate,https://www.cityofsouthgate.org,,html,,no,mixed,Calendar URL not confirmed
+City of Alhambra calendar,parks-rec,Alhambra,https://www.cityofalhambra.org,https://www.cityofalhambra.org/Calendar.aspx,CivicPlus,https://www.cityofalhambra.org/RSSFeed.aspx?ModID=58&CID=All-calendar.xml,yes,mixed,CivicPlus RSS; includes commission meetings plus farmers market
+City of Monterey Park calendar,parks-rec,Monterey Park,https://www.montereypark.ca.gov,https://www.montereypark.ca.gov/Calendar.aspx,CivicPlus,https://www.montereypark.ca.gov/RSSFeed.aspx?ModID=58&CID=All-calendar.xml,yes,yes,CivicPlus RSS; many library/recreation community events
+City of Pico Rivera,parks-rec,Pico Rivera,https://www.pico-rivera.org,,html,,no,mixed,Calendar URL not confirmed
+City of Norwalk,parks-rec,Norwalk,https://www.norwalkca.gov,,html,,no,mixed,Calendar URL not confirmed
+City of Lakewood events,parks-rec,Lakewood,https://www.lakewoodcity.org,https://www.lakewoodcity.org/events,Granicus OpenCities,,no,mixed,Domain redirects to lakewoodca.gov; no feed found
+City of Cerritos,parks-rec,Cerritos,https://www.cerritos.gov,,html,,no,mixed,Calendar URL not confirmed
+City of Malibu calendar,parks-rec,Malibu,https://www.malibucity.org,https://www.malibucity.org/Calendar.aspx,CivicPlus,https://www.malibucity.org/RSSFeed.aspx?ModID=58&CID=All-calendar.xml,yes,mixed,CivicPlus RSS; recreation classes plus meetings
+City of Rancho Palos Verdes calendar,parks-rec,Rancho Palos Verdes,https://www.rpvca.gov,https://www.rpvca.gov/Calendar.aspx,CivicPlus,https://www.rpvca.gov/RSSFeed.aspx?ModID=58&CID=All-calendar.xml,yes,mixed,"CivicPlus RSS; mostly meetings, some community events"
+City of Diamond Bar calendar,parks-rec,Diamond Bar,https://www.diamondbarca.gov,https://www.diamondbarca.gov/Calendar.aspx,CivicPlus,https://www.diamondbarca.gov/RSSFeed.aspx?ModID=58&CID=All-calendar.xml,yes,mixed,CivicPlus RSS
+City of San Gabriel calendar,parks-rec,San Gabriel,https://www.sangabrielcity.com,https://www.sangabrielcity.com/Calendar.aspx,CivicPlus,https://www.sangabrielcity.com/RSSFeed.aspx?ModID=58&CID=All-calendar.xml,yes,mixed,CivicPlus RSS
+City of Baldwin Park calendar,parks-rec,Baldwin Park,https://www.baldwinpark.com,https://www.baldwinpark.com/Calendar.aspx,CivicPlus,https://www.baldwinpark.com/RSSFeed.aspx?ModID=58&CID=All-calendar.xml,yes,mixed,CivicPlus RSS; recreation programs
+California State Parks,parks-rec,Statewide (LA County parks),https://www.parks.ca.gov,https://www.parks.ca.gov/Events,html,,no,mixed,Per-park event listings; no feed found
+Los Angeles Public Library,library,Los Angeles,https://www.lapl.org,https://www.lapl.org/events,Drupal (custom),,no,yes,No iCal/RSS/JSON found; events endpoints tried 404/406
+LA County Library,library,Los Angeles County,https://lacountylibrary.org,https://lacountylibrary.org/events/,WordPress (custom),,no,yes,/feed/ is blog only; no event feed found
+Long Beach Public Library,library,Long Beach,https://www.longbeach.gov/library/,https://www.longbeach.gov/library/events/,Trumba,https://www.trumba.com/calendars/long-beach-public-library.ics,yes,yes,Trumba webName long-beach-public-library; also .rss
+Santa Monica Public Library,library,Santa Monica,https://www.smpl.org,https://www.smpl.org/events,html,,no,yes,No feed found
+Pasadena Public Library,library,Pasadena,https://www.cityofpasadena.net/library/,https://pasadena.libnet.info/events,Communico (libnet.info),,no,yes,Communico eeventcaldata endpoint not working for this tenant; also uses pasadena.evanced.info and LibCal
+"Glendale Library, Arts & Culture",library,Glendale,https://www.glendaleca.gov/government/departments/library-arts-culture,https://glendaleca.libnet.info/events,Communico (libnet.info),https://glendaleca.libnet.info/eeventcaldata?event_type=0&req=%7B%22private%22%3Afalse%2C%22date%22%3A%222026-11-05%22%2C%22days%22%3A7%2C%22locations%22%3A%5B%5D%2C%22ages%22%3A%5B%5D%2C%22types%22%3A%5B%5D%7D,yes,yes,Undocumented JSON used by the Communico calendar page; change date and days params; also glac.bibliocommons.com for catalog
+Burbank Public Library,library,Burbank,https://www.burbanklibrary.org,https://www.burbanklibrary.org/events,Communico,,no,yes,Page references Communico API; tenant JSON endpoint not found
+San Gabriel Public Library,library,San Gabriel,https://sgpl.libcal.com,https://sgpl.libcal.com/calendar,LibCal,,no,yes,LibCal; ical_subscribe needs a valid calendar id (not found)
+Santa Clarita Public Library,library,Santa Clarita,https://santaclaritalibrary.com,https://santaclaritalibrary.com/events,WordPress,,no,yes,/feed/ is blog only
+Cerritos Library,library,Cerritos,https://www.cerritos.gov/library,https://www.cerritos.gov/library,html,,no,yes,Page loads; no feed found
+Culver City Julian Dixon Library (county),library,Culver City,https://lacountylibrary.org,https://lacountylibrary.org/events/,WordPress (custom),,no,yes,"Culver City library is part of LA County Library; same source as above, probably duplicate"
+Pasadena Public Library (LibCal),library,Pasadena,https://pasadena.libcal.com,https://pasadena.libcal.com/calendar,LibCal,,no,yes,Calendar page loads; no valid ical id found
+The Getty Center and Villa,museum-garden,Los Angeles,https://www.getty.edu,https://www.getty.edu/visit/cal/,html,,no,yes,No feed found
+LACMA,museum-garden,Los Angeles,https://www.lacma.org,https://www.lacma.org/events,Drupal,,no,yes,No feed found
+Hammer Museum,museum-garden,Los Angeles,https://hammer.ucla.edu,https://hammer.ucla.edu/programs-events,Drupal,https://hammer.ucla.edu/rss.xml,yes,yes,"RSS mixes exhibitions, programs and news; filter items"
+The Broad,museum-garden,Los Angeles,https://www.thebroad.org,https://www.thebroad.org/events,Drupal,,no,yes,No feed found
+MOCA,museum-garden,Los Angeles,https://www.moca.org,https://www.moca.org/calendar,html,,no,yes,No feed found
+Natural History Museum and La Brea Tar Pits,museum-garden,Los Angeles,https://www.nhm.org,https://www.nhm.org/events,html,,no,yes,No feed found
+California Science Center,museum-garden,Los Angeles,https://californiasciencecenter.org,https://californiasciencecenter.org/events,html,,no,yes,Site returns 403 to scripted fetches
+The Huntington,museum-garden,San Marino,https://www.huntington.org,https://www.huntington.org/events,html,,no,yes,Rate-limits scripted fetches (429)
+Descanso Gardens,museum-garden,La Canada Flintridge,https://www.descansogardens.org,https://www.descansogardens.org/events/,html,,no,yes,403 to scripted fetches
+Los Angeles County Arboretum,museum-garden,Arcadia,https://www.arboretum.org,https://www.arboretum.org/events/,WordPress,https://www.arboretum.org/events/feed/,yes,yes,Events RSS (WordPress); items are events
+Autry Museum,museum-garden,Los Angeles,https://theautry.org,https://theautry.org/events,Drupal,,no,yes,No feed found
+Skirball Cultural Center,museum-garden,Los Angeles,https://www.skirball.org,https://www.skirball.org/programs,Drupal,,no,yes,No feed found
+Japanese American National Museum,museum-garden,Los Angeles,https://www.janm.org,https://www.janm.org/events,Drupal,,no,yes,No feed found
+Craft Contemporary,museum-garden,Los Angeles,https://www.craftcontemporary.org,https://www.craftcontemporary.org/events/,html,,no,yes,403 to scripted fetches
+Academy Museum of Motion Pictures,museum-garden,Los Angeles,https://www.academymuseum.org,https://www.academymuseum.org/en/calendar,html,,no,yes,No feed found
+Petersen Automotive Museum,museum-garden,Los Angeles,https://www.petersen.org,https://www.petersen.org/events,html,,no,yes,No feed found
+Aquarium of the Pacific,museum-garden,Long Beach,https://www.aquariumofpacific.org,https://www.aquariumofpacific.org/events,html,,no,yes,No feed found
+Los Angeles Zoo,museum-garden,Los Angeles,https://www.lazoo.org,https://www.lazoo.org/events/,html,,no,yes,403 to scripted fetches
+Kidspace Children's Museum,museum-garden,Pasadena,https://kidspacemuseum.org,https://kidspacemuseum.org/events/?ical=1,WordPress The Events Calendar,https://kidspacemuseum.org/events/?ical=1,yes,yes,iCal verified
+Griffith Observatory,museum-garden,Los Angeles,https://griffithobservatory.org,https://griffithobservatory.org/events/,WordPress The Events Calendar,https://griffithobservatory.org/events/?ical=1,yes,yes,iCal returns few events; /events/feed/ RSS also lists events
+Hollywood Bowl / LA Phil,museum-garden,Los Angeles,https://www.hollywoodbowl.com,https://www.hollywoodbowl.com/calendar,html,,no,yes,Ticketed concerts; no public feed found
+LA Phil calendar,museum-garden,Los Angeles,https://www.laphil.com,https://www.laphil.com/calendar,Basker,,no,yes,Ticketed concerts
+Music Center,museum-garden,Los Angeles,https://www.musiccenter.org,https://www.musiccenter.org/tickets-events/calendar/,html,,no,yes,403 to scripted fetches
+Museum of Latin American Art (MOLAA),museum-garden,Long Beach,https://www.molaa.org,https://www.molaa.org/events,html,,no,yes,No feed found
+Long Beach Museum of Art,museum-garden,Long Beach,https://lbma.org,https://lbma.org/events,Craft CMS,,no,yes,No feed found
+The Wende Museum,museum-garden,Culver City,https://www.thewende.org,https://www.thewende.org/events/,WordPress The Events Calendar,https://www.thewende.org/events/?ical=1,yes,yes,iCal verified; also /events/feed/ RSS
+Forest Lawn Museum,museum-garden,Glendale,https://www.forestlawn.com,https://www.forestlawn.com/events,html,,no,yes,403 to scripted fetches
+The Grove,mall-center,Los Angeles,https://www.thegrovela.com,https://www.thegrovela.com/events/,WordPress,,no,yes,/feed/ is blog only; no iCal
+Americana at Brand,mall-center,Glendale,https://www.americanaatbrand.com,https://www.americanaatbrand.com/events,WordPress,,no,yes,/feed/ is blog only; no iCal
+Santa Monica Place,mall-center,Santa Monica,https://www.santamonicaplace.com,https://www.santamonicaplace.com/events,html,,no,mixed,No feed found
+Glendale Galleria,mall-center,Glendale,https://www.glendalegalleria.com,https://www.glendalegalleria.com/events,html,,no,mixed,No feed found
+Del Amo Fashion Center,mall-center,Torrance,https://www.simon.com/mall/del-amo-fashion-center,https://www.simon.com/mall/del-amo-fashion-center/events,html,,no,mixed,Simon.com page; terms not reviewed
+Citadel Outlets,mall-center,Commerce,https://citadeloutlets.com,https://citadeloutlets.com/events/,html,,no,mixed,No feed found
+The Bloc,mall-center,Los Angeles,https://www.theblocla.com,https://www.theblocla.com/events/,html,,no,mixed,No feed found
+Shoreline Village,mall-center,Long Beach,https://www.shorelinevillage.com,https://www.shorelinevillage.com/events/,WordPress,,no,yes,/feed/ is blog only
+Universal CityWalk,mall-center,Universal City,https://www.universalcitywalk.com,,html,,no,mixed,Connection reset on scripted fetch; website not confirmed by fetch (0)
+Gloria Molina Grand Park,city-arts-civic,Los Angeles,https://grandparkla.org,https://grandparkla.org/events/,WordPress The Events Calendar?,,no,yes,/feed/ is old blog posts; ical not valid
+El Pueblo / Olvera Street,city-arts-civic,Los Angeles,https://elpueblo.lacity.gov,https://elpueblo.lacity.gov/events,html,,no,yes,Also olvera-street.com (Wix)
+CicLAvia,city-arts-civic,Los Angeles,https://www.ciclavia.org,https://www.ciclavia.org,WordPress,,no,yes,/feed/ is blog only; few events per year
+Downtown Santa Monica / Third Street Promenade,city-arts-civic,Santa Monica,https://www.downtownsm.com,https://www.downtownsm.com/events,html,,no,yes,No feed found
+Old Pasadena Management District,city-arts-civic,Pasadena,https://www.oldpasadena.org,https://www.oldpasadena.org/events,Silverstripe,,no,yes,No feed found
+Downtown LA (DTLA Alliance),city-arts-civic,Los Angeles,https://downtownla.com,https://downtownla.com/events,html,,no,yes,No feed found
+Larchmont Village,city-arts-civic,Los Angeles,https://www.larchmontvillage.com,,html,,no,mixed,Calendar URL not confirmed
+Hollywood Farmers Market,city-arts-civic,Los Angeles,https://www.hollywoodfarmersmarket.net,https://www.hollywoodfarmersmarket.net/,WordPress,,no,mixed,/feed/ is blog only
+Original Farmers Market,city-arts-civic,Los Angeles,https://www.originalfarmersmarket.com,https://www.originalfarmersmarket.com/events,html,,no,yes,No feed found
+Pasadena Arts Council events,city-arts-civic,Pasadena,https://www.pasadenaartscouncil.org,https://www.pasadenaartscouncil.org/events,html,,no,yes,No feed found
+Long Beach Economic Development calendar,city-arts-civic,Long Beach,https://www.longbeach.gov/economicdevelopment/,https://www.longbeach.gov/economicdevelopment/,Trumba,https://www.trumba.com/calendars/economic-development.rss,yes,mixed,Business-oriented events; Trumba RSS
+City of LA official calendar,city-arts-civic,Los Angeles,https://www.lacity.org,https://www.lacity.org/calendar,Drupal,,no,mixed,No feed found
+LA Dept of Cultural Affairs,city-arts-civic,Los Angeles,https://culturela.org,https://culturela.org/events,html,,no,yes,Not confirmed reachable by scripted fetch

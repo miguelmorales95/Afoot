@@ -1,36 +1,70 @@
-// Event feeds: Eventbrite organizers and Ticketmaster venues whose upcoming events come in every
-// day through the official APIs (npm run feeds, run by the GitHub Actions job after ingest).
-// Each event goes to its own venue (matched by name or location, or created), linked to its
-// ticket page. A feed whose key isn't set is skipped.
+// Event feeds, pulled every day by `npm run feeds` (the GitHub Actions job, after ingest):
+//   eventbrite_organizer, ticketmaster_venue  official APIs; each event goes to its own venue
+//     (matched by name or location, or created), linked to its ticket page. Skipped without a key.
+//   ics, localist  official public calendars (colleges, libraries, parks, museums, malls; see
+//     lib/calendarFeeds.ts). Events with a map pin go to that place; the rest to the feed's venue.
 import { supabase } from "./supabase";
 import { storeExtractedEvents } from "./ingest";
 import { venueFor } from "./venueMatch";
 import { eventbriteOrganizerEvents, ticketmasterVenueEvents, type LinkedEvent } from "./eventApis";
+import { icsEvents, localistEvents, type FeedOptions } from "./calendarFeeds";
 
-export async function runFeeds(log: (s: string) => void = console.log) {
-  const { data: feeds, error } = await supabase.from("event_feeds").select("*").eq("active", true);
+interface FeedRow { id: string; kind: string; ref: string; label: string | null; venue_id: string | null; options: FeedOptions | null }
+
+const SOURCE: Record<string, "ticketmaster" | "eventbrite" | "feed"> = {
+  ticketmaster_venue: "ticketmaster", eventbrite_organizer: "eventbrite", ics: "feed", localist: "feed",
+};
+
+export async function eventsOf(f: Pick<FeedRow, "kind" | "ref" | "options">): Promise<LinkedEvent[] | string> {
+  if (f.kind === "ticketmaster_venue") return process.env.TICKETMASTER_API_KEY ? ticketmasterVenueEvents(f.ref) : "skipped (no TICKETMASTER_API_KEY)";
+  if (f.kind === "eventbrite_organizer") return process.env.EVENTBRITE_TOKEN ? eventbriteOrganizerEvents(f.ref) : "skipped (no EVENTBRITE_TOKEN)";
+  if (f.kind === "ics") return icsEvents(f.ref, f.options ?? {});
+  if (f.kind === "localist") return localistEvents(f.ref, f.options ?? {});
+  return `skipped (unknown kind ${f.kind})`;
+}
+
+/** The venue for one feed event: its own place when it has a pin (or the feed has no venue), else the feed's. */
+async function venueOf(f: FeedRow, e: LinkedEvent): Promise<string | null> {
+  const calendar = f.kind === "ics" || f.kind === "localist";
+  if (!calendar) return venueFor({ name: e.venue_name, address: e.address, lat: e.lat, lng: e.lng, source: SOURCE[f.kind] });
+  if (e.venue_name && e.lat != null && e.lng != null) {
+    // "Royce Hall, UCLA": room and hall names repeat across campuses, so they carry the feed's name.
+    const name = f.label && !e.venue_name.toLowerCase().includes(f.label.toLowerCase()) ? `${e.venue_name}, ${f.label}` : e.venue_name;
+    return venueFor({ name: name.slice(0, 120), address: e.address, lat: e.lat, lng: e.lng, source: "feed" });
+  }
+  return f.venue_id;
+}
+
+export async function runFeeds(log: (s: string) => void = console.log, only?: string) {
+  let q = supabase.from("event_feeds").select("*").eq("active", true);
+  if (only) q = q.or(`label.ilike.%${only.replace(/[%,()]/g, " ")}%,ref.eq.${only.replace(/[,()]/g, "")}`);
+  const { data: feeds, error } = await q;
   if (error) throw error;
-  for (const f of feeds ?? []) {
+  for (const f of (feeds ?? []) as FeedRow[]) {
     let result: string;
     try {
-      const keyed = f.kind === "ticketmaster_venue" ? process.env.TICKETMASTER_API_KEY : process.env.EVENTBRITE_TOKEN;
-      if (!keyed) { log(`- ${f.label ?? f.ref}: skipped (no ${f.kind === "ticketmaster_venue" ? "TICKETMASTER_API_KEY" : "EVENTBRITE_TOKEN"})`); continue; }
-      const events: LinkedEvent[] = f.kind === "ticketmaster_venue" ? await ticketmasterVenueEvents(f.ref) : await eventbriteOrganizerEvents(f.ref);
-      // Group by venue so each venue's events are stored together.
+      const events = await eventsOf(f);
+      if (typeof events === "string") { log(`- ${f.label ?? f.ref}: ${events}`); continue; }
+      // Group by venue, then by title: the same title on several dates is one event with several dates.
       const byVenue = new Map<string, LinkedEvent[]>();
+      let placeless = 0;
       for (const e of events) {
-        const key = `${e.venue_name}|${e.address}`;
-        byVenue.set(key, [...(byVenue.get(key) ?? []), e]);
+        const venueId = await venueOf(f, e);
+        if (!venueId) { placeless++; continue; }
+        // Events filed under the feed's own venue keep their room or building in the description.
+        const where = venueId === f.venue_id && e.venue_name ? `Where: ${e.venue_name}\n` : "";
+        byVenue.set(venueId, [...(byVenue.get(venueId) ?? []), { ...e, description: `${where}${e.description ?? ""}`.trim() || null }]);
       }
       let n = 0;
-      for (const list of byVenue.values()) {
-        const v = list[0];
-        const venueId = await venueFor({ name: v.venue_name, address: v.address, lat: v.lat, lng: v.lng, source: f.kind === "ticketmaster_venue" ? "ticketmaster" : "eventbrite" });
-        // Same title on several dates becomes one event with several occurrences.
+      for (const [venueId, list] of byVenue) {
         const byTitle = new Map<string, LinkedEvent[]>();
         for (const e of list) byTitle.set(e.title, [...(byTitle.get(e.title) ?? []), e]);
+        // Something on more than 20 days in a calendar is opening hours or a standing exhibit, not an outing.
+        if (f.kind === "ics" || f.kind === "localist") {
+          for (const [title, same] of byTitle) if (new Set(same.map((e) => e.starts_at.slice(0, 10))).size > 20) byTitle.delete(title);
+        }
         n += await storeExtractedEvents({
-          venueId, source: f.kind === "ticketmaster_venue" ? "ticketmaster" : "eventbrite",
+          venueId, source: SOURCE[f.kind] ?? "feed",
           events: [...byTitle.values()].map((same) => ({
             title: same[0].title, description: same[0].description, category: same[0].category, price: same[0].price, url: same[0].url,
             recurrence_description: null, is_recurring: same.length > 1, tags: [],
@@ -38,7 +72,7 @@ export async function runFeeds(log: (s: string) => void = console.log) {
           })),
         });
       }
-      result = `${events.length} event(s), ${n} occurrence(s)`;
+      result = `${events.length} event(s), ${n} occurrence(s), ${byVenue.size} venue(s)${placeless ? `, ${placeless} without a place (set the feed's venue)` : ""}`;
     } catch (e) {
       result = `error: ${(e as Error).message}`;
     }

@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuthed } from "@/lib/adminAuth";
 import { supabase } from "@/lib/supabase";
 import { eventbriteOrganizerId } from "@/lib/eventApis";
+import { venueFor } from "@/lib/venueMatch";
 
-// Event feeds (Eventbrite organizers, Ticketmaster venues), pulled daily by `npm run feeds`.
+// Event feeds (Eventbrite organizers, Ticketmaster venues, iCal and Localist calendars), pulled
+// daily by `npm run feeds`.
 //   GET                              -> { feeds, keys: { ticketmaster, eventbrite } }
-//   POST { kind, ref, label? }       -> adds one (an Eventbrite organizer link or id; a Ticketmaster venue id)
+//   POST { kind, ref, label?, venue?, address? } -> adds one (an Eventbrite organizer link or id; a
+//        Ticketmaster venue id; a calendar's URL, with the venue its unplaced events belong to)
 //   PATCH { id, active }             -> pause or resume
 //   DELETE ?id=                      -> remove (events already imported stay)
 export const dynamic = "force-dynamic";
@@ -21,10 +24,25 @@ export async function POST(req: NextRequest) {
   if (!adminAuthed(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const b = await req.json().catch(() => ({}));
   const raw = String(b.ref ?? "").trim();
+  const calendar = b.kind === "ics" || b.kind === "localist";
   const ref = b.kind === "eventbrite_organizer" ? eventbriteOrganizerId(raw)
-    : b.kind === "ticketmaster_venue" && /^[A-Za-z0-9]{6,24}$/.test(raw) ? raw : null;
-  if (!ref) return NextResponse.json({ error: b.kind === "eventbrite_organizer" ? "Paste the organizer's Eventbrite page (eventbrite.com/o/...)" : "Paste the venue's Ticketmaster id (npm run ticketmaster:venues finds it)" }, { status: 400 });
-  const { data, error } = await supabase.from("event_feeds").upsert({ kind: b.kind, ref, label: String(b.label ?? "").trim().slice(0, 120) || null, active: true }, { onConflict: "kind,ref" }).select("*").single();
+    : b.kind === "ticketmaster_venue" && /^[A-Za-z0-9]{6,24}$/.test(raw) ? raw
+    : calendar && /^(https?|webcal):\/\/\S+$/i.test(raw) ? raw : null;
+  const label = String(b.label ?? "").trim().slice(0, 120) || null;
+  if (!ref) {
+    const help = b.kind === "eventbrite_organizer" ? "Paste the organizer's Eventbrite page (eventbrite.com/o/...)"
+      : b.kind === "ticketmaster_venue" ? "Paste the venue's Ticketmaster id (npm run ticketmaster:venues finds it)"
+      : "Paste the calendar's feed URL (https://…)";
+    return NextResponse.json({ error: help }, { status: 400 });
+  }
+  // Calendar events without their own map pin are listed at this venue (found by name, or made).
+  let venue_id: string | null = null;
+  if (calendar) {
+    const name = String(b.venue ?? "").trim() || label;
+    if (!name) return NextResponse.json({ error: "Name the place its events are at (e.g. the campus or library)." }, { status: 400 });
+    venue_id = await venueFor({ name, address: String(b.address ?? "").trim() || null, lat: null, lng: null, source: "feed" });
+  }
+  const { data, error } = await supabase.from("event_feeds").upsert({ kind: b.kind, ref, label, active: true, ...(calendar ? { venue_id } : {}) }, { onConflict: "kind,ref" }).select("*").single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ feed: data });
 }

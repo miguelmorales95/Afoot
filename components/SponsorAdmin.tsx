@@ -37,6 +37,11 @@ interface Campaign {
   href: string;
   status: CampaignStatus;
   price_cents: number | null;
+  billing: "monthly" | "once";
+  billing_status?: string;
+  stripe_payment_link_url?: string | null;
+  stripe_invoice_url?: string | null;
+  paid_at?: string | null;
   counts?: Counts;
 }
 
@@ -47,7 +52,17 @@ interface Data {
   campaigns?: (Campaign & { id: string; counts: Counts })[];
   areas?: string[];
   today?: string;
+  stripe?: boolean;
 }
+
+// Where a campaign's payment stands (set by the Stripe webhook).
+const BILLING_LABEL: Record<string, string> = {
+  unbilled: "Not billed", link_sent: "Payment link sent", invoiced: "Invoice sent", paid: "Paid",
+  active: "Paying monthly", past_due: "Payment failed (Stripe is retrying)", canceled: "Billing stopped",
+};
+const BILLING_STYLE: Record<string, string> = {
+  paid: "text-emerald-300", active: "text-emerald-300", past_due: "text-red-300", canceled: "text-white/40",
+};
 
 const PRODUCTS: Record<CampaignProduct, string> = {
   area_sponsor: "Area sponsor card",
@@ -72,6 +87,7 @@ export default function SponsorAdmin() {
   const [campaignForm, setCampaignForm] = useState<Campaign | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [billUrl, setBillUrl] = useState<{ id: string; url: string; how: string } | null>(null);
 
   const headers = useCallback(
     (json = false): Record<string, string> => ({
@@ -103,12 +119,24 @@ export default function SponsorAdmin() {
     return true;
   };
 
+  const bill = async (id: string, how: "link" | "invoice") => {
+    if (how === "invoice" && !confirm("Stripe will email an invoice to the sponsor's contact now. Send it?")) return;
+    setBusy(true);
+    setError(null);
+    const res = await fetch("/api/admin/sponsors", { method: "POST", headers: headers(true), body: JSON.stringify({ kind: "bill", id, how }) });
+    const d = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (!res.ok) { setError(d.error || "Stripe didn't accept that."); return; }
+    setBillUrl({ id, url: d.url, how });
+    await load();
+  };
+
   if (!data) return null;
 
   const newCampaign = (sponsorId: string): Campaign => ({
     sponsor_id: sponsorId, product: "area_sponsor", area: "all", event_id: null,
     starts_on: data.today ?? "", ends_on: "", badge: "", title: "", body: "", cta: "See what's on →",
-    href: "https://", status: "draft", price_cents: null,
+    href: "https://", status: "draft", price_cents: null, billing: "monthly",
   });
 
   return (
@@ -204,8 +232,19 @@ export default function SponsorAdmin() {
                       </div>
                       <p className="mt-1 text-white/50">
                         {c.starts_on} → {c.ends_on}
-                        {c.price_cents != null ? ` · $${(c.price_cents / 100).toFixed(2)}` : ""}
+                        {c.price_cents != null ? ` · $${(c.price_cents / 100).toFixed(2)}${c.billing === "monthly" ? "/month" : ""}` : ""}
                       </p>
+                      <p className={`text-xs ${BILLING_STYLE[c.billing_status ?? ""] ?? "text-white/50"}`}>
+                        {c.billing === "monthly" ? "Monthly" : "One payment"} · {BILLING_LABEL[c.billing_status ?? "unbilled"] ?? c.billing_status}
+                        {c.paid_at ? ` · last paid ${c.paid_at.slice(0, 10)}` : ""}
+                        {c.stripe_invoice_url && <> · <a className="underline" href={c.stripe_invoice_url} target="_blank" rel="noreferrer">invoice</a></>}
+                      </p>
+                      {billUrl?.id === c.id && billUrl.url && (
+                        <p className="mt-1 flex items-center gap-2 text-xs">
+                          <input readOnly value={billUrl.url} onFocus={(e) => e.target.select()} className={`${input} py-1 text-xs`} />
+                          <button onClick={() => void navigator.clipboard?.writeText(billUrl.url)} className="shrink-0 rounded-full bg-white/10 px-2 py-1 hover:bg-white/20">Copy</button>
+                        </p>
+                      )}
                       {c.product === "featured_event" && (
                         <p className="text-white/50">Features: {c.event_title ?? (c.event_id ? "an event that's no longer listed" : "no event")}</p>
                       )}
@@ -233,6 +272,20 @@ export default function SponsorAdmin() {
                           className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/60 hover:bg-white/5">
                           Edit
                         </button>
+                        {c.price_cents != null && !["paid", "active"].includes(c.billing_status ?? "") && data.stripe && (
+                          <>
+                            <button disabled={busy} onClick={() => void bill(c.id, "link")}
+                              className="rounded-full bg-white/10 px-3 py-1 text-xs hover:bg-white/20 disabled:opacity-40">
+                              {c.stripe_payment_link_url ? "Copy payment link" : "Payment link"}
+                            </button>
+                            {!c.stripe_invoice_url && (
+                              <button disabled={busy} onClick={() => void bill(c.id, "invoice")}
+                                className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/60 hover:bg-white/5 disabled:opacity-40">
+                                Send invoice (net 15)
+                              </button>
+                            )}
+                          </>
+                        )}
                         {c.status === "live" && data.today && (c.starts_on > data.today || c.ends_on < data.today) && (
                           <span className="text-xs text-amber-300">Live, but today is outside its dates, so it isn&apos;t showing.</span>
                         )}
@@ -305,7 +358,8 @@ function CampaignForm({ value, areas, sponsors, busy, headers, onChange, onCance
             </select>
           </Field>
           <Field label="Product">
-            <select className={input} value={value.product} onChange={set("product")}>
+            <select className={input} value={value.product}
+              onChange={(e) => onChange({ ...value, product: e.target.value as CampaignProduct, billing: e.target.value === "featured_event" ? "once" : "monthly" })}>
               {Object.entries(PRODUCTS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
           </Field>
@@ -352,7 +406,13 @@ function CampaignForm({ value, areas, sponsors, busy, headers, onChange, onCance
         <Field label="Line" hint={`~90 characters (${chars(value.body, 90)})`}><textarea className={input} rows={2} value={value.body ?? ""} onChange={set("body")} maxLength={160} /></Field>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Button" hint={`~20 characters (${chars(value.cta, 20)})`}><input className={input} value={value.cta ?? ""} onChange={set("cta")} maxLength={40} /></Field>
-          <Field label="Price" hint="USD, for your records">
+          <Field label="Billing">
+            <select className={input} value={value.billing} onChange={set("billing")}>
+              <option value="monthly">Monthly until the end date</option>
+              <option value="once">One payment</option>
+            </select>
+          </Field>
+          <Field label="Price" hint={value.billing === "monthly" ? "USD per month, charged by Stripe" : "USD, charged once by Stripe"}>
             <input className={input} type="number" min={0} step="0.01"
               value={value.price_cents == null ? "" : value.price_cents / 100}
               onChange={(e) => onChange({ ...value, price_cents: e.target.value === "" ? null : Math.round(Number(e.target.value) * 100) })} />

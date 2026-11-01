@@ -94,6 +94,8 @@ function Feeds({ headers }: { headers: Record<string, string> }) {
   const [kind, setKind] = useState("eventbrite_organizer");
   const [ref, setRef] = useState("");
   const [label, setLabel] = useState("");
+  const [venue, setVenue] = useState("");
+  const [address, setAddress] = useState("");
   const [error, setError] = useState<string | null>(null);
   const load = useCallback(async () => {
     const res = await fetch("/api/admin/feeds", { headers });
@@ -105,31 +107,41 @@ function Feeds({ headers }: { headers: Record<string, string> }) {
     setError(null);
     const res = await fetch(`/api/admin/feeds${q}`, { method, headers: { "Content-Type": "application/json", ...headers }, body: body && JSON.stringify(body) });
     const b = await res.json().catch(() => ({}));
-    if (!res.ok) setError(b.error || "That didn't work"); else { setRef(""); setLabel(""); void load(); }
+    if (!res.ok) setError(b.error || "That didn't work"); else { setRef(""); setLabel(""); setVenue(""); setAddress(""); void load(); }
   };
   const input = "rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm outline-none focus:border-fuchsia-500/50";
   return (
     <section className="mt-8">
       <h2 className="text-lg font-bold">Event feeds <span className="text-white/40">· {feeds.length}</span></h2>
       <p className="mt-1 text-sm text-white/50">
-        Eventbrite organizers and Ticketmaster venues, pulled daily through their official APIs.
+        Eventbrite organizers, Ticketmaster venues, and official calendars (iCal or Localist) of colleges,
+        libraries, parks, museums and malls, pulled daily. Try a calendar first with
+        <code className="mx-1 text-white/70">npm run feeds -- --dry-run ics &lt;url&gt;</code>.
         {keys && !keys.eventbrite && " Eventbrite needs EVENTBRITE_TOKEN."}{keys && !keys.ticketmaster && " Ticketmaster needs TICKETMASTER_API_KEY."}
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         <select className={input} value={kind} onChange={(e) => setKind(e.target.value)}>
           <option value="eventbrite_organizer">Eventbrite organizer</option>
           <option value="ticketmaster_venue">Ticketmaster venue</option>
+          <option value="ics">Calendar (iCal URL)</option>
+          <option value="localist">Calendar (Localist)</option>
         </select>
         <input className={`${input} min-w-64 flex-1`} value={ref} onChange={(e) => setRef(e.target.value)}
-          placeholder={kind === "eventbrite_organizer" ? "https://www.eventbrite.com/o/name-12345678" : "Ticketmaster venue id (npm run ticketmaster:venues)"} />
-        <input className={input} value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Name (optional)" />
-        <button disabled={!ref.trim()} onClick={() => call("POST", { kind, ref, label })} className="rounded-full bg-fuchsia-600 px-4 py-1.5 text-sm font-semibold disabled:opacity-40">Add</button>
+          placeholder={kind === "eventbrite_organizer" ? "https://www.eventbrite.com/o/name-12345678" : kind === "ticketmaster_venue" ? "Ticketmaster venue id (npm run ticketmaster:venues)" : kind === "ics" ? "https://…/calendar.ics" : "https://calendar.example.edu"} />
+        <input className={input} value={label} onChange={(e) => setLabel(e.target.value)} placeholder={kind === "ics" || kind === "localist" ? "Short name, e.g. UCLA" : "Name (optional)"} />
+        {(kind === "ics" || kind === "localist") && (
+          <>
+            <input className={input} value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="Venue for unplaced events (e.g. UCLA campus)" />
+            <input className={input} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Its address" />
+          </>
+        )}
+        <button disabled={!ref.trim()} onClick={() => call("POST", { kind, ref, label, venue, address })} className="rounded-full bg-fuchsia-600 px-4 py-1.5 text-sm font-semibold disabled:opacity-40">Add</button>
       </div>
       {error && <p className="mt-2 text-sm text-red-300">{error}</p>}
       <div className="mt-3 space-y-2">
         {feeds.map((f) => (
           <div key={f.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-white/10 px-3 py-2 text-sm">
-            <span className="rounded-full bg-white/5 px-2 py-0.5 text-[11px]">{f.kind === "eventbrite_organizer" ? "Eventbrite" : "Ticketmaster"}</span>
+            <span className="rounded-full bg-white/5 px-2 py-0.5 text-[11px]">{({ eventbrite_organizer: "Eventbrite", ticketmaster_venue: "Ticketmaster", ics: "iCal", localist: "Localist" } as Record<string, string>)[f.kind] ?? f.kind}</span>
             <b>{f.label || f.ref}</b>
             <span className="text-white/40">{f.last_run_at ? `${new Date(f.last_run_at).toLocaleDateString()}: ${f.last_result}` : "not run yet"}</span>
             <span className="flex-1" />

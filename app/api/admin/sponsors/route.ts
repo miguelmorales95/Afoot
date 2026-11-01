@@ -4,6 +4,7 @@ import { supabase, hasSupabase } from "@/lib/supabase";
 import { CAMPAIGN_STATUSES, type CampaignStatus } from "@/lib/ads";
 import { CAMPAIGN_COLUMNS, isUuid, todayLA, type CampaignRow } from "@/lib/campaigns";
 import { LAUNCH_AREAS } from "@/lib/areas";
+import { paymentLinkFor, sendInvoiceFor, stripe } from "@/lib/sponsorBilling";
 
 // Sponsors and campaigns for /admin. Protected by ADMIN_TOKEN like the review queue.
 //   GET                      -> { ready, sponsors, campaigns (with counts) }
@@ -11,11 +12,12 @@ import { LAUNCH_AREAS } from "@/lib/areas";
 //   POST { kind: "sponsor",  sponsor }   create (no id) or update
 //   POST { kind: "campaign", campaign }  create (no id) or update
 //   POST { kind: "status",   id, status }
+//   POST { kind: "bill",     id, how: "link" | "invoice" }  -> { url } (Stripe payment link or invoice)
 export const dynamic = "force-dynamic";
 
 
 const AREAS = ["all", ...LAUNCH_AREAS.map((a) => a.name)];
-const MIGRATION = "supabase/migrations/20261023120000_sponsor_campaigns.sql";
+const MIGRATION = "supabase/migrations/20261023120000_sponsor_campaigns.sql and 20261030000000_sponsor_billing.sql";
 
 interface Counts { views: number; clicks: number; views30: number; clicks30: number }
 
@@ -65,7 +67,7 @@ export async function GET(req: NextRequest) {
     event_title: (Array.isArray(events) ? events[0] : events)?.title ?? null,
     counts: counts[c.id] ?? { views: 0, clicks: 0, views30: 0, clicks30: 0 },
   }));
-  return NextResponse.json({ ready: true, sponsors: sp.data, campaigns, areas: AREAS, today: todayLA() });
+  return NextResponse.json({ ready: true, sponsors: sp.data, campaigns, areas: AREAS, today: todayLA(), stripe: !!stripe() });
 }
 
 export async function POST(req: NextRequest) {
@@ -78,6 +80,17 @@ export async function POST(req: NextRequest) {
     const { error } = await supabase.from("campaigns")
       .update({ status: body.status as CampaignStatus, updated_at: new Date().toISOString() }).eq("id", body.id);
     return error ? failed(error.message) : NextResponse.json({ ok: true });
+  }
+
+  if (body?.kind === "bill") {
+    if (!isUuid(body.id) || (body.how !== "link" && body.how !== "invoice")) return bad("invalid billing request");
+    try {
+      const url = body.how === "link" ? await paymentLinkFor(body.id) : await sendInvoiceFor(body.id);
+      return NextResponse.json({ ok: true, url });
+    } catch (err) {
+      // Our own messages explain what to fix; Stripe's errors are passed on as they are.
+      return NextResponse.json({ error: (err as Error).message }, { status: 400 });
+    }
   }
 
   if (body?.kind === "sponsor") {
@@ -115,11 +128,13 @@ export async function POST(req: NextRequest) {
       href: str(c.href, 1000) ?? undefined,
       status: c.status ?? "draft",
       price_cents: c.price_cents === "" || c.price_cents == null ? null : Math.round(Number(c.price_cents)),
+      billing: c.billing === "once" || c.billing === "monthly" ? c.billing : c.product === "featured_event" ? "once" : "monthly",
       updated_at: new Date().toISOString(),
     };
     if (c.id && !isUuid(c.id)) return bad("invalid campaign id");
     const problem = checkCampaign(row);
     if (problem) return bad(problem);
+    if (c.id) await retireStaleLink(c.id, row);
     const { data, error } = c.id
       ? await supabase.from("campaigns").update(row).eq("id", c.id).select().single()
       : await supabase.from("campaigns").insert(row).select().single();
@@ -143,6 +158,15 @@ function checkCampaign(r: Partial<CampaignRow>): string | null {
   if (!CAMPAIGN_STATUSES.includes(r.status as CampaignStatus)) return "Unknown status.";
   if (r.price_cents != null && (!Number.isFinite(r.price_cents) || r.price_cents < 0)) return "Price must be a positive number.";
   return null;
+}
+
+/** A changed price or billing makes an unpaid payment link wrong: switch it off so a new one is made. */
+async function retireStaleLink(id: string, row: Partial<CampaignRow>) {
+  const { data: old } = await supabase.from("campaigns").select("price_cents, billing, billing_status, stripe_payment_link_id").eq("id", id).maybeSingle();
+  if (!old?.stripe_payment_link_id || old.billing_status !== "link_sent") return;
+  if (old.price_cents === row.price_cents && old.billing === row.billing) return;
+  await stripe()?.paymentLinks.update(old.stripe_payment_link_id, { active: false }).catch(() => {});
+  await supabase.from("campaigns").update({ stripe_payment_link_id: null, stripe_payment_link_url: null, billing_status: "unbilled" }).eq("id", id);
 }
 
 /** Trimmed, length-capped text; empty -> null. */

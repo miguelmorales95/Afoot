@@ -2,10 +2,12 @@
 
 Aggregates the **small, hard-to-find local events** — karaoke, board game nights, open mics,
 neighborhood shows — that never make it onto Eventbrite/Dice/Partiful. It pulls events from
-venue **calendar pages** (and, soon, **newsletters**), expands recurring events into real dates
-with an LLM, and shows you what's on near you. No logins. Ad-supported.
+venue **calendar pages**, **newsletters**, event links people share, and official Eventbrite and
+Ticketmaster feeds, expands recurring events into real dates with an LLM, and shows you what's on
+near you. No login needed to browse. Supported by local sponsors, with no tracking.
 
-LA-focused for now.
+LA-focused for now. **Live at https://afoot.somedude.app** (Vercel project `afoot`, deploys from `main`;
+events come from Supabase project `xpqzvmggzhsaggrebxxv`, schema `afoot`).
 
 ## See it right now (demo mode)
 
@@ -78,15 +80,30 @@ vibe/activity **tags** pulled from each event.
 
 ### Newsletters (the differentiator)
 
-Most small venues announce events only in a weekly email. Two ways to capture them, both feeding
-the same source-agnostic extractor (tagged `source: "newsletter"`):
+Most small venues announce events only in a weekly email. Afoot subscribes its own address
+(`afoot-news@somedude.app`) to their mailing lists:
 
-- **IMAP poller** (`npm run newsletters -- --loop`) — subscribe a dedicated inbox to venue
-  newsletters, set `IMAP_*` in `.env.local`, and leave it polling. No domain needed.
-- **Inbound webhook** (`/api/inbound-email`) — point a provider's parse hook here (Cloudflare
-  Email Worker in `docs/cloudflare-email-worker.js`, or SendGrid/Mailgun/Postmark).
+```
+venue newsletter ─▶ Cloudflare Email Routing ─▶ Email Worker ─▶ /api/inbound-email (saves it)
+                                                                   │
+              daily GitHub Actions job (npm run newsletters -- --queue) ◀─┘ matches venue, AI reads events
+```
 
-Emails are matched to a venue by sender address/domain, body links, or a keyword. Map a sender:
+- **The webhook only saves** each email (`inbound_emails`, status `queued`): Vercel has no AI key
+  and short time limits. It needs `INBOUND_EMAIL_SECRET` and refuses everything without it on the
+  live site. The Worker (`docs/cloudflare-email-worker.js`, no packages, paste it into the
+  Cloudflare dashboard) forwards the raw email; its header comment has the setup steps.
+- **Matching:** a known sender address or domain, the sender's domain being the venue's website
+  (learned for next time), the sender's name being a venue's name, a link to a venue's site, or a
+  keyword. Unmatched emails wait in **/admin → Newsletters**, where one click assigns the venue and
+  remembers the sender.
+- **"Confirm your subscription" emails** are caught and shown in /admin with their confirm links.
+- **/admin → Newsletters** also lists venues with a known signup page (`venues.newsletter_url`)
+  whose first newsletter hasn't arrived yet.
+- **IMAP poller** (`npm run newsletters -- --loop`): the alternative to the webhook. Subscribe a
+  mailbox, set `IMAP_*` in `.env.local`, and it reads and processes mail directly.
+
+Map a sender by hand (rarely needed now):
 
 ```bash
 npm run newsletter:add -- smog-city-torrance news@smogcitybrewing.com
@@ -100,7 +117,8 @@ Unmatched emails are logged in `inbound_emails` for review.
 Optional, privacy-first social layer:
 
 - **Sign in** with Google/Facebook (Supabase Auth) — enable the providers in the Supabase
-  dashboard and add `<site>/auth/callback` as a redirect URL. One tap, no passwords.
+  dashboard and add `<site>/auth/callback` as a redirect URL. One tap, no passwords. Not switched
+  on yet for the live site.
 - **RSVP, but attendance is private.** "I'm going" never shows a public count or attendee list.
   The going-count is used **only** server-side (`nearby_events`) to **rank** events, and RSVP is
   the **key that unlocks the event chat**.
@@ -151,8 +169,8 @@ Enable it once:
 npm i -D playwright && npx playwright install chromium
 ```
 
-Best run locally or on a VM (Playwright doesn't fit Vercel's serverless functions); the daily
-cron on Vercel handles the plain-fetch venues.
+Playwright doesn't fit Vercel's serverless functions, so the daily ingest runs on GitHub Actions
+(see [Deploy](#deploy-vercel)), which installs Chromium.
 
 ---
 
@@ -189,6 +207,8 @@ Fill in:
 | `NOMINATIM_EMAIL` | Your email (Nominatim's usage policy requires a contact) |
 | `TICKETMASTER_API_KEY` | Optional. Free Discovery API key (developer.ticketmaster.com): reads Ticketmaster links and venue feeds |
 | `EVENTBRITE_TOKEN` | Optional. Eventbrite private token (eventbrite.com → Account settings → Developer links → API keys): organizer feeds. Eventbrite links read fine without it |
+| `INBOUND_EMAIL_SECRET` | A long random string, also set in the Cloudflare Email Worker. **Required** on the live site: without it the newsletter webhook refuses everything |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Optional. Sponsor billing ([Sponsors](#sponsors)); without them the billing buttons stay hidden |
 | `CRON_SECRET` | A long random string (`openssl rand -hex 32`). **Required:** without it the scheduled ingest route refuses to run |
 | `OLLAMA_NUM_CTX` | Local model's context window (default 16384); Ollama's own default drops most of a long page |
 | `OLLAMA_TIMEOUT_MS` | How long to wait for the local model per page (default 120000). On a machine without a GPU a long page can take over 5 minutes, which hits Node's own request limit: use Anthropic for bulk ingests there |
@@ -248,8 +268,19 @@ npm run ingest -- --url https://example.com/events --name "Some Bar"   # any pag
   their upcoming events daily in the GitHub Actions job.
 - Events from links and feeds go to a matching venue (same name, or within ~60 m) or a new one, which
   starts paused for scraping. Public links are fetched only from public addresses (`lib/safeFetch.ts`).
-- Tables: `event_links`, `event_feeds` (migration `20261029010000`; apply with `npm run migrate -- <file>`
-  after `npm run backup:db`).
+- **Official calendars** (`/admin` → *Event feeds*, kinds *Calendar (iCal URL)* and *Calendar
+  (Localist)*): colleges, libraries, parks departments, museums and malls publish feeds; Afoot reads
+  them with no AI (`lib/calendarFeeds.ts`). Events with a map pin get their own venue ("Royce Hall,
+  UCLA"); the rest are listed at the feed's venue with the room in the description. Academic noise
+  (deadlines, finals, office hours, online-only) and anything on more than 20 days (opening hours,
+  standing exhibits) are skipped. Try one first: `npm run feeds -- --dry-run localist
+  https://calendar.usc.edu` or `npm run feeds -- --dry-run ics <url>`.
+- **Coverage lists:** [`data/sources/`](data/sources/README.md) is the checklist of every kind of
+  place Afoot should read (colleges, libraries, parks, museums, malls, small venues…) with
+  researched calendars; `npm run sources:import -- --dry-run` then `npm run sources:import` loads
+  them (verified feeds become feeds, other calendar pages go to the /admin review queue).
+- Tables: `event_links`, `event_feeds` (migrations `20261029010000`, `20261030020000`; apply with
+  `npm run migrate -- <file>` after `npm run backup:db`).
 
 ### 6. Run
 
@@ -281,13 +312,17 @@ Search a neighborhood (e.g. *Torrance*) or click **use my current location**.
 ```
 app/
   page.tsx                  # home feed: search + List/Table/Map views + filters
-  submit/page.tsx           # "add a venue" form (no login)
-  admin/page.tsx            # review queue: submissions + candidates, grouped/deduped
+  submit/page.tsx           # "add a venue" or "add an event" (paste a link) form, no login
+  admin/page.tsx            # review: submissions, candidates, event links, feeds, flags, sponsors
+  privacy/page.tsx          # plain-language privacy page (update when collection changes)
+  chat/, inbox/, profile/   # optional sign-in: RSVP-gated event chat, contact requests
   api/admin/review/route.ts # GET queue / POST approve|reject (ADMIN_TOKEN gated)
+  api/admin/{links,feeds,flags}/route.ts # event-link queue, Eventbrite/Ticketmaster feeds, flagged events
+  api/feedback/route.ts     # flags, heads-ups and one-tap checks (thresholds live here)
   api/events/route.ts       # GET nearby events (nearby_events RPC, or demo data)
   api/geocode/route.ts      # GET place name -> lat/lng (Nominatim proxy)
   api/submit/route.ts       # POST venue submission
-  api/cron/ingest/route.ts  # scheduled ingestion (Vercel Cron)
+  api/cron/ingest/route.ts  # one-off ingest on Vercel (CRON_SECRET); the daily run is GitHub Actions
   api/inbound-email/route.ts # ⭐ newsletter webhook (provider-agnostic)
   api/admin/sponsors/route.ts # sponsors + campaigns for /admin (ADMIN_TOKEN gated)
   api/ads/live/route.ts     # GET live sponsor campaigns (card text only, CDN-cacheable)
@@ -305,6 +340,13 @@ lib/
   ingest.ts                 # ingestion orchestration: fetch -> extract -> upsert
   discover.ts               # ⭐ web discovery: search -> classify -> candidate_venues
   newsletter.ts             # ⭐ inbound email -> match venue -> extract events
+  eventLink.ts / eventApis.ts # read a pasted event link (official API, page data, then AI)
+  feeds.ts                  # daily feeds: Eventbrite, Ticketmaster, iCal and Localist calendars
+  calendarFeeds.ts          # read official iCal / Localist calendars (no AI)
+  sponsorBilling.ts         # Stripe payment links, invoices and webhook handling for sponsors
+  venueMatch.ts             # match an event to an existing venue (name, or within ~60 m)
+  safeFetch.ts              # fetch only public addresses for user-supplied links
+  recheck.ts                # AI clean-up of uncertain events (npm run recheck)
   search.ts                 # web search (DuckDuckGo keyless / Brave API)
   discovery-queries.ts      # LA neighborhoods x activities query generator
   domain.ts                 # domain dedupe + aggregator/social skip-list
@@ -322,17 +364,28 @@ scripts/
   discover.ts               # CLI: web discovery crawler (--loop to leave running)
   promote.ts                # CLI: approved candidates -> venues
   ingest.ts                 # CLI: run ingestion
-  newsletters.ts            # CLI: IMAP poller for newsletter inboxes (--loop)
+  newsletters.ts            # CLI: read queued newsletters (--queue, daily job) or poll IMAP (--loop)
+  import-sources.ts         # CLI: data/sources/*.csv -> calendar feeds + review queue
   add-newsletter-source.ts  # CLI: map a newsletter sender -> venue
   geocode-venues.ts         # CLI: backfill venue coordinates
+  seed-venues.ts            # CLI: data/la-venues.csv -> review queue
+  feeds.ts / ticketmaster-venues.ts # CLI: pull feeds / find a Ticketmaster venue id
+  recheck.ts                # CLI: re-check uncertain events
+  backup-db.ts / migrate.ts # CLI: back up the database / apply one migration file
   ads-report.ts             # CLI: monthly sponsor reports (npm run ads:report)
 supabase/
   schema.sql                # tables + nearby_events() + RLS
   seed.sql                  # the 3 starter venues
-  migrations/               # standalone changes to apply on their own (sponsor campaigns)
+  migrations/               # changes applied on their own (sponsor campaigns, event links + feeds)
 docs/
   cloudflare-email-worker.js # inbound-email Worker for the newsletter webhook
+.github/workflows/ingest.yml # daily ingest + feeds (GitHub Actions)
+deploy/systemd/             # optional timers on your own computer (recheck, weekly backup)
+SC_2_Afoot/                 # events from screenshots with a local vision model (npm run screenshots)
 ```
+
+**Database changes:** run `npm run backup:db` first (it writes to `~/Backups/supabase-xpqzvmggzhsaggrebxxv/`),
+then `npm run migrate -- supabase/migrations/<file>.sql`.
 
 ---
 
@@ -396,6 +449,23 @@ to skip obvious bots). Days are Los Angeles days. Because nothing identifies a v
 be inflated by someone scripting a real browser; treat sudden spikes with suspicion rather than
 adding tracking to stop them.
 
+**Getting paid (Stripe):** set the campaign's *Billing* (monthly until the end date, or one
+payment) and *Price*, then on the campaign:
+
+- **Payment link:** a Stripe page to send with the IO. It doesn't expire, can be paid once, and a
+  monthly plan stops by itself after the campaign's last day (no partial-month charge).
+- **Send invoice (net 15):** Stripe emails an invoice for one payment to the sponsor's contact
+  email (bank transfer or card).
+- Stripe reports back to `/api/stripe/webhook`: a paid campaign that's *approved* goes *live*;
+  a failed payment shows "Payment failed" while Stripe retries; when a monthly plan stops early
+  (retries ran out, or cancelled) a live card is paused. Changing the price retires an unpaid link.
+- Set-up once: apply `supabase/migrations/20261030000000_sponsor_billing.sql`; in Stripe →
+  Developers → Webhooks, add `https://afoot.somedude.app/api/stripe/webhook` with the events
+  `checkout.session.completed`, `invoice.paid`, `invoice.payment_failed`,
+  `customer.subscription.updated` and `customer.subscription.deleted`; put `STRIPE_SECRET_KEY` and
+  that endpoint's `STRIPE_WEBHOOK_SECRET` in Vercel. Use test-mode keys first. Afoot stores only
+  Stripe's ids; Stripe holds every card and bank detail.
+
 **Monthly report:** `npm run ads:report -- --month 2026-10` writes, for each sponsor with activity
 that month, `reports/ads/2026-10/<sponsor>.html` and `.txt` (views, clicks and click rate per week,
 the card text, and a promo-phrase suggestion). `reports/` is gitignored. Add `--send` to also email
@@ -406,13 +476,10 @@ each sponsor's contact through Resend; that needs `RESEND_API_KEY` and `ADS_REPO
 
 These are deliberate MVP cuts, roughly in priority order:
 
-1. **Playwright rendering is local/VM only.** The headless fallback (for Zebulon et al.) works
-   great from `npm run ingest` on your machine, but doesn't fit Vercel's serverless functions.
-   Run rendered ingestion on a small always-on box (or GitHub Action), and let the Vercel cron
-   handle the plain-fetch venues. A hosted browser (Browserless/ScrapingBee) is a drop-in swap.
-2. **Submissions are collected but not auto-approved.** They land in the `submissions` table as
-   `pending`. Add a tiny admin view (or just the Supabase table UI) to approve → promote to a
-   `venues` row, then let the next ingest pick it up.
+1. **Some venue calendars can't be read.** 15 seeded venues whose pages the extractor can't read
+   are paused (`active = false`); they need a newsletter source, a feed, or screenshots
+   (`SC_2_Afoot/`). Never scrape Facebook or aggregators whose terms forbid it.
+2. **Submissions and event links are reviewed by hand** in `/admin` before anything is published.
 3. **Recurrence expansion is LLM-computed.** Cheap and flexible, but spot-check dates early; if
    you see drift, use Claude (`LLM_PROVIDER=anthropic`) or a stronger Ollama model.
 4. **Discovery search is keyless by default** (DuckDuckGo HTML), which can be rate-limited or
@@ -420,7 +487,9 @@ These are deliberate MVP cuts, roughly in priority order:
 5. **Candidate + unmatched-newsletter review is manual** (by design, to keep quality high).
    `promote --auto <score>` auto-approves high-confidence venue finds; unmatched newsletters sit
    in `inbound_emails` until you add a sender mapping.
-```
+6. **Local Ollama is slow without a GPU** (minutes per long page): use Claude for bulk ingests.
+7. **Calendar feeds read iCal and Localist only.** RSS and other JSON calendars are listed as
+   calendar pages (read by AI) until a reader is added.
 
 ## Safety notes
 

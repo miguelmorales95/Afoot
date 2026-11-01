@@ -41,8 +41,17 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           LLM_PROVIDER: anthropic
-      - name: Event feeds (Eventbrite organizers, Ticketmaster venues)
-        if: ${{ !inputs.venue }}
+      # The steps below run even if some venues failed above, so one bad night doesn't stop them.
+      - name: Newsletters (emails saved by the inbound-email webhook)
+        if: ${{ !cancelled() && !inputs.venue }}
+        run: npm run newsletters -- --queue
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          LLM_PROVIDER: anthropic
+      - name: Event feeds (Eventbrite organizers, Ticketmaster venues, calendar feeds)
+        if: ${{ !cancelled() && !inputs.venue }}
         run: npm run feeds
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}

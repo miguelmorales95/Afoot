@@ -16,12 +16,17 @@ export interface CampaignRow extends LiveCampaign {
   ends_on: string;
   status: CampaignStatus;
   price_cents: number | null;
+  billing: "monthly" | "once";
+  billing_status: string;
+  stripe_payment_link_url: string | null;
+  stripe_invoice_url: string | null;
+  paid_at: string | null;
   created_at: string;
   updated_at: string;
 }
 
 export const CAMPAIGN_COLUMNS =
-  "id, sponsor_id, product, area, event_id, starts_on, ends_on, badge, title, body, cta, href, status, price_cents, created_at, updated_at";
+  "id, sponsor_id, product, area, event_id, starts_on, ends_on, badge, title, body, cta, href, status, price_cents, billing, billing_status, stripe_payment_link_url, stripe_invoice_url, paid_at, created_at, updated_at";
 
 /** Today's date in Los Angeles (campaign dates and daily counts use LA days). */
 export function todayLA(date = new Date()): string {

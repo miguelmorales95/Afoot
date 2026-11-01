@@ -653,3 +653,70 @@ create table if not exists afoot.event_feeds (
 alter table afoot.event_feeds enable row level security;
 
 grant all on afoot.event_links, afoot.event_feeds to service_role;
+
+-- ---------------------------------------------------------------------------
+-- Sponsor billing (also supabase/migrations/20261030000000_sponsor_billing.sql)
+-- ---------------------------------------------------------------------------
+--
+
+alter table afoot.campaigns add column if not exists billing text not null default 'monthly';
+alter table afoot.campaigns add column if not exists billing_status text not null default 'unbilled';
+alter table afoot.campaigns add column if not exists stripe_payment_link_id text;
+alter table afoot.campaigns add column if not exists stripe_payment_link_url text;
+alter table afoot.campaigns add column if not exists stripe_subscription_id text;
+alter table afoot.campaigns add column if not exists stripe_invoice_id text;
+alter table afoot.campaigns add column if not exists stripe_invoice_url text;
+alter table afoot.campaigns add column if not exists paid_at timestamptz;
+
+do $$ begin
+  alter table afoot.campaigns add constraint campaigns_billing_check check (billing in ('monthly', 'once'));
+exception when duplicate_object then null; end $$;
+do $$ begin
+  -- unbilled -> link_sent | invoiced -> paid (one payment) | active (monthly) -> past_due -> canceled
+  alter table afoot.campaigns add constraint campaigns_billing_status_check
+    check (billing_status in ('unbilled', 'link_sent', 'invoiced', 'paid', 'active', 'past_due', 'canceled'));
+exception when duplicate_object then null; end $$;
+
+update afoot.campaigns set billing = 'once' where product = 'featured_event' and billing_status = 'unbilled';
+
+create index if not exists idx_campaigns_subscription on afoot.campaigns(stripe_subscription_id) where stripe_subscription_id is not null;
+
+create table if not exists afoot.stripe_events (
+  id          text primary key,   -- Stripe's event id (evt_…)
+  type        text not null,
+  received_at timestamptz default now()
+);
+alter table afoot.stripe_events enable row level security;
+revoke all on afoot.stripe_events from anon, authenticated;
+grant all on afoot.stripe_events to service_role;
+
+-- ---------------------------------------------------------------------------
+-- Newsletter queue (also supabase/migrations/20261030010000_newsletter_queue.sql)
+-- ---------------------------------------------------------------------------
+--
+
+alter table afoot.inbound_emails add column if not exists body_html text;
+create index if not exists idx_inbound_emails_status on afoot.inbound_emails(status, received_at);
+
+update afoot.venues set newsletter_url = v.url from (values
+  ('alex-s-bar',                      'https://alexsbar.com/pages/newsletter'),
+  ('highland-park-brewery-chinatown', 'https://hpb.us10.list-manage.com/subscribe?u=0bcd0c19f05b97aad7b59cb3c&id=188120fa27'),
+  ('lyric-hyperion',                  'https://lyrichyperion.com/'),
+  ('the-hotel-cafe',                  'https://hotelcafe.us5.list-manage.com/subscribe?u=6b17f569807925b601a9e5bd3&id=fdbf5ba881'),
+  ('the-world-stage',                 'https://theworldstage.us14.list-manage.com/subscribe?u=ebf98418551a1749b333e016c&id=1ec5ac281f'),
+  ('absolution-brewing-company',      'https://absolutionbrewingcompany.us14.list-manage.com/subscribe?u=76bf62087e10ef79b33db63cf&id=f9576bafde'),
+  ('village-well-books-coffee',       'https://villagewell.com/'),
+  ('arts-district-brewing',           'https://www.artsdistrictbrewing.com/'),
+  ('the-last-bookstore',              'https://www.lastbookstorela.com/')
+) as v(slug, url)
+where afoot.venues.slug = v.slug and afoot.venues.newsletter_url is null;
+
+-- ---------------------------------------------------------------------------
+-- Calendar feeds (also supabase/migrations/20261030020000_calendar_feeds.sql)
+-- ---------------------------------------------------------------------------
+alter table afoot.event_feeds drop constraint if exists event_feeds_kind_check;
+alter table afoot.event_feeds add constraint event_feeds_kind_check
+  check (kind in ('eventbrite_organizer', 'ticketmaster_venue', 'ics', 'localist'));
+alter table afoot.event_feeds add column if not exists venue_id uuid references afoot.venues(id) on delete set null;
+alter table afoot.event_feeds add column if not exists source_type text;
+alter table afoot.event_feeds add column if not exists options jsonb not null default '{}'::jsonb;

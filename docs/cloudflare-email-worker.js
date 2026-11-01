@@ -1,43 +1,37 @@
-// Cloudflare Email Worker — routes inbound newsletters to Afoot.
+// Cloudflare Email Worker: forwards each newsletter that reaches Afoot's inbox address to the
+// site, unchanged (raw email). No packages, so it can be pasted into the dashboard editor.
 //
-// Setup (free):
-//   1. Add your domain to Cloudflare and enable Email Routing.
-//   2. Create a catch-all (or a dedicated address like newsletters@yourdomain)
-//      and route it to this Worker.
-//   3. `npm i postal-mime` in the Worker project.
-//   4. Set Worker vars: WEBHOOK_URL = https://your-app.vercel.app/api/inbound-email
-//                       INBOUND_SECRET = (same as INBOUND_EMAIL_SECRET in the app)
-//   5. Subscribe that address to venue newsletters.
+// Setup (free), in the Cloudflare dashboard for somedude.app:
+//   1. Workers & Pages → Create → Worker "afoot-newsletters" → Edit code → paste this file → Deploy.
+//   2. That worker → Settings → Variables and Secrets:
+//        WEBHOOK_URL    = https://afoot.somedude.app/api/inbound-email   (Text)
+//        INBOUND_SECRET = the same value as INBOUND_EMAIL_SECRET in Vercel (Secret)
+//        FORWARD_TO     = optional: a verified Email Routing destination (your own inbox) that gets
+//                         any email the site couldn't take, so nothing is lost
+//   3. Email → Email Routing → Routing rules → Create address: afoot-news@somedude.app,
+//      action "Send to a Worker", worker "afoot-newsletters".
+//   4. Subscribe that address to venue newsletters (/admin → Newsletters lists them).
 //
-// Then add sender->venue mappings so emails route to the right place:
-//   npm run newsletter:add -- smog-city-torrance news@smogcitybrewing.com
-
-import PostalMime from "postal-mime";
+// The site only saves each email; the daily GitHub Actions job reads the events.
 
 export default {
   async email(message, env) {
-    const email = await new PostalMime().parse(message.raw);
-
-    const payload = {
-      from: email.from?.address,
-      fromName: email.from?.name,
-      to: message.to,
-      subject: email.subject,
-      text: email.text,
-      html: email.html,
-      messageId: email.messageId,
-      receivedAt: new Date().toISOString(),
-    };
-
-    const res = await fetch(`${env.WEBHOOK_URL}?secret=${env.INBOUND_SECRET}`, {
+    const raw = await new Response(message.raw).arrayBuffer();
+    // Vercel accepts request bodies up to 4.5 MB; a newsletter that big is mostly images.
+    if (raw.byteLength > 4_000_000) {
+      console.log(`too big for the site: ${message.from}, ${raw.byteLength} bytes`);
+      if (env.FORWARD_TO) await message.forward(env.FORWARD_TO);
+      return;
+    }
+    const res = await fetch(env.WEBHOOK_URL, {
       method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
+      headers: { "content-type": "message/rfc822", "x-inbound-secret": env.INBOUND_SECRET },
+      body: raw,
     });
-
+    // Never reject: a bounce would tell the venue's mailing list to drop the address.
     if (!res.ok) {
-      // Keep the message in the queue by throwing; Cloudflare will retry.
-      throw new Error(`webhook ${res.status}`);
+      console.log(`webhook ${res.status} for ${message.from}: ${await res.text()}`);
+      if (env.FORWARD_TO) await message.forward(env.FORWARD_TO);
     }
   },
 };

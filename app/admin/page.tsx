@@ -6,6 +6,7 @@ import type { ReviewGroup } from "@/lib/types";
 import FlagQueue from "@/components/FlagQueue";
 import EventLinkQueue from "@/components/EventLinkQueue";
 import SponsorAdmin from "@/components/SponsorAdmin";
+import NewsletterAdmin from "@/components/NewsletterAdmin";
 
 const TOKEN_KEY = "afoot_admin_token";
 
@@ -116,6 +117,8 @@ export default function AdminPage() {
       {!loading && !demo && <EventLinkQueue />}
 
       {!loading && !demo && <FlagQueue />}
+
+      {!loading && !demo && <NewsletterAdmin />}
 
       {!loading && !demo && <SponsorAdmin />}
 
