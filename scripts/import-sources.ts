@@ -3,6 +3,7 @@
 //   npm run sources:import -- --dry-run                 # print what would be added (reads only)
 //   npm run sources:import                              # every data/sources/*.csv
 //   npm run sources:import -- data/sources/colleges.csv
+//   npm run sources:import -- --feeds-only <file>       # feeds only; calendar pages aren't queued
 // A row with a verified feed (feed_verified = yes) becomes an event feed: Localist API, iCal,
 // CivicPlus calendar RSS or Communico library JSON,
 // with the institution as the venue for events without their own map pin. A row with only a
@@ -33,9 +34,16 @@ function feedOf(r: Record<string, string>): { kind: "ics" | "localist" | "civicp
   return null; // RSS and JSON feeds of other kinds aren't read yet: listed as a calendar page instead
 }
 
+/** The optional feed_options column: JSON such as {"include": "\\bvs\\b", "where": "Malibu"}. */
+function optionsOf(r: Record<string, string>): Record<string, unknown> {
+  if (!r.feed_options?.trim()) return {};
+  try { return JSON.parse(r.feed_options); } catch { console.log(`    ! ${r.name}: feed_options isn't valid JSON, ignored`); return {}; }
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const dryRun = args.includes("--dry-run");
+  const feedsOnly = args.includes("--feeds-only");
   const files = args.filter((a) => !a.startsWith("--"));
   const list = files.length ? files : fs.readdirSync(DIR).filter((f) => f.endsWith(".csv")).map((f) => path.join(DIR, f));
 
@@ -63,11 +71,12 @@ async function main() {
         const venue_id = await venueFor({ name: r.name, address: [r.name, r.city, "CA"].filter(Boolean).join(", "), lat: null, lng: null, website: r.website || null, source: "feed" });
         const { error } = await supabase.from("event_feeds").upsert({
           kind: feed.kind, ref: feed.ref, label: r.name.slice(0, 120), venue_id, source_type: r.type || null, active: true,
-          options: { public_only: r.type === "university" || r.type === "community-college" || undefined },
+          options: { public_only: r.type === "university" || r.type === "community-college" || undefined, ...optionsOf(r) },
         }, { onConflict: "kind,ref" });
         if (error) console.log(`    ! ${error.message}`);
         continue;
       }
+      if (feedsOnly) { skipped++; continue; }
       const page = (r.calendar_url || "").trim();
       const domain = page && registrableDomain(page);
       // Big institutions share a domain across departments, so the calendar page's own host counts.

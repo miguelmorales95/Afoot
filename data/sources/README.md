@@ -13,6 +13,7 @@ one, and how far along it is. Update it whenever a source type is added or swept
 | **Newsletter** | The venue's mailing list, sent to Afoot's inbox and read by AI | `lib/newsletter.ts`, /admin → Newsletters |
 | **Calendar page** | The venue's events page, read by AI each night (headless browser when needed) | `lib/ingest.ts`, `venues.events_url` |
 | **Event link** | Someone pastes a link on /submit; reviewed in /admin | `lib/eventLink.ts` |
+| **Fixed schedule** | Places with set days and hours and no calendar (farmers and flea markets): listed in `recurring.csv`, dates made nightly | `scripts/recurring.ts` (`npm run recurring`) |
 | **Screenshots** | For places that only post on Instagram or Facebook: a local vision model reads screenshots | `SC_2_Afoot/` |
 
 Never scrape Facebook or Instagram, or aggregators whose terms forbid it (Songkick, Yelp, Patch).
@@ -24,6 +25,13 @@ feed_verified, public_events, notes`). Load them with `npm run sources:import --
 
 - `colleges.csv`: every college and university in LA County, plus the big ones next door
 - `public-places.csv`: parks and recreation, libraries, museums and gardens, malls and plazas, city arts and civic calendars
+- `athletics-cinemas-theaters.csv`: college sports, repertory cinemas, theaters and improv houses
+- `community.csv`: neighborhood councils, farmers markets, art walks and night markets (imported with
+  `--feeds-only`: the councils' pages are mostly meetings, and the markets are in `recurring.csv`)
+- `recurring.csv`: fixed weekly or monthly schedules (`name, category, days, time, address, website, notes`)
+
+An optional `feed_options` column holds JSON feed options, e.g. `{"include": "\\bvs\\.?\\s", "where": "Malibu"}`
+keeps a team's home games (`where` matches the event's place).
 
 ## Coverage checklist
 
@@ -38,7 +46,7 @@ researched, not imported yet; **to do** = not searched yet.
 | Community colleges (all of LA County) | All 9 LACCD colleges, PCC, SMC, El Camino, LBCC, Mt. SAC | iCal / calendar page | partial: SMC, El Camino, Compton, Glendale, Rio Hondo, Citrus, Cerritos live; LACCD has no feed |
 | Art and design schools | ArtCenter, CalArts, Otis, SCI-Arc | iCal / calendar page | list in `colleges.csv` |
 | Campus performance centers and museums | CAP UCLA, The Broad Stage, Carpenter Center, Fowler | iCal / Ticketmaster | list in `colleges.csv` |
-| College athletics | UCLA/USC home games, CSU and community-college sports | Sidearm iCal feeds | to do |
+| College athletics | UCLA/USC home games, CSU and community-college sports | Sidearm / PrestoSports iCal, home games only | partial: 20 schools live (2026-11-01); UCLA, ELAC, El Camino, Glendale, Cal State LA, Whittier have no feed |
 | Public libraries | LAPL (73 branches), LA County Library (85), city libraries | LibCal / BiblioCommons / Communico iCal | partial: Long Beach live (~200 events); LAPL and County have no feed |
 | City parks and recreation | LA City Rec & Parks, LA County Parks, every city's parks department | CivicPlus iCal / calendar page | list in `public-places.csv` |
 | Beaches, harbors, state parks | Marina del Rey, Santa Monica Pier, Will Rogers | calendar page | list in `public-places.csv` |
@@ -47,7 +55,7 @@ researched, not imported yet; **to do** = not searched yet.
 | Malls and outdoor centers | The Grove, Americana, Westfields, Third Street Promenade, CityWalk | calendar page | list in `public-places.csv` |
 | City arts and civic | LA Cultural Affairs, Grand Park, Olvera Street, CicLAvia, city arts councils | iCal / calendar page | list in `public-places.csv` |
 | Business improvement districts | Downtown LA, Hollywood, Old Town Torrance, Downtown Long Beach | calendar page | list in `public-places.csv` |
-| Neighborhood councils | 99 LA neighborhood councils (town halls, cleanups, fairs) | Google Calendar iCal | to do |
+| Neighborhood councils | 99 LA neighborhood councils (town halls, cleanups, fairs) | Google Calendar / Trumba / Events Calendar iCal, meetings filtered out | partial: 37 feeds live (2026-11-01); ~25 have no feed |
 | Community centers and YMCAs | City community centers, YMCAs, senior centers | calendar page | to do |
 | Faith communities with public programs | Church concert series, temple festivals, cultural nights | calendar page / newsletter | to do |
 
@@ -64,8 +72,8 @@ researched, not imported yet; **to do** = not searched yet.
 | Record stores, comic and game shops | Permanent Records, Game Empire, comic shops | calendar page / screenshots | partial (discovery) |
 | Cafes with open mics or readings | Stories, Village Well | newsletter / screenshots | partial |
 | Galleries and art openings | Avenue 50 Studio, Chinatown galleries, art walks | calendar page / newsletter | partial |
-| Small theaters and theater companies | Echo Theater, Skylight Theatre, Pasadena Playhouse | calendar page / Ticketmaster | to do |
-| Repertory and indie cinemas | New Beverly, Vidiots, Egyptian, Laemmle | calendar page / iCal | to do |
+| Small theaters and theater companies | Echo Theater, Skylight Theatre, Pasadena Playhouse | calendar page / Ticketmaster | partial: 39 listed, 2 feeds, the rest calendar pages (2026-11-01) |
+| Repertory and indie cinemas | New Beverly, Vidiots, Egyptian, Laemmle | calendar page | partial: 23 listed, no feeds exist; calendar pages (2026-11-01) |
 | Dance socials and studios | Salsa and swing nights, dance studios | calendar page / screenshots | to do |
 | Run, ride and hike clubs | Run clubs, group rides, guided hikes | Strava/Meetup links / screenshots | to do |
 | Maker spaces, plant and craft shops | Workshops, repair cafes | calendar page / Eventbrite | to do |
@@ -75,9 +83,9 @@ researched, not imported yet; **to do** = not searched yet.
 
 | Place type | Examples | Best method | Status |
 |---|---|---|---|
-| Farmers markets | 100+ certified markets in LA County | market network calendars | to do |
-| Night markets and street fairs | 626 Night Market, KTown night market, First Fridays | calendar page / Eventbrite | to do |
-| Art walks | Downtown LA Art Walk, Long Beach, Pasadena | calendar page | to do |
+| Farmers markets | 100+ certified markets in LA County | fixed schedule in `recurring.csv` | partial: 29 markets live (2026-11-01); Santa Monica, Pasadena, Silver Lake, Long Beach, Claremont to confirm |
+| Night markets, flea markets and street fairs | Smorgasburg, Rose Bowl Flea, Melrose Trading Post, 626 Night Market | `recurring.csv` / iCal | partial: 6 in `recurring.csv`, Downtown Long Beach and Chinatown feeds; 626 is seasonal (Jul 2027) |
+| Art walks | Downtown LA Art Walk, Long Beach, Pasadena | calendar page / `recurring.csv` | to do: no official current schedules found for DTLA, NELA, Abbot Kinney, Leimert, San Pedro |
 | Festivals and parades | Cultural festivals, heritage months, holiday events | city calendars / event links | partial (event links) |
 | Organizer pages on Eventbrite | Local organizers that list everything on Eventbrite | Eventbrite organizer feed | partial (feed support, 0 feeds yet) |
 
@@ -119,3 +127,10 @@ libraries alone list ~200 events in 60 days). The rest go to the review queue as
   Alhambra, Whittier, Pomona), LA Cultural Affairs, Long Beach and Santa Monica arts councils, MOLAA,
   farmers market networks, and the cities with no calendar found (Glendale, Manhattan Beach, Redondo,
   El Segundo, Lancaster, Pomona, Downey, Compton, South Gate, Pico Rivera, Norwalk, Cerritos).
+
+**`athletics-cinemas-theaters.csv` and `community.csv`, 2026-11-01** (88 and 156 rows). 22 athletics/theater
+feeds (~270 home games in 45 days) and 40 community feeds imported; 58 cinema and theater calendar pages
+approved. Neighborhood-council calendars are mostly meetings: their feeds exclude meetings, boards,
+committees and the like, and items shared between feeds (the Valley councils' regional Trumba calendar)
+are listed once. Digital Gym (San Diego), LAFF (ended), Secret Movie Club and Street Food Cinema (no fixed
+venue) were turned off. 29 farmers markets and 6 flea/food markets went into `recurring.csv` (~210 dates).

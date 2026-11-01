@@ -10,12 +10,14 @@
 //   communico a Communico library calendar (https://library.libnet.info), read from its events JSON
 // Events that carry a map pin go to that place's venue; the rest go to the feed's own venue
 // (the campus, the library…). Feed options (event_feeds.options, all optional):
-//   { "include": "regex", "exclude": "regex", "days": 60, "public_only": true, "max": 400 }
+//   { "include": "regex", "exclude": "regex", "where": "regex", "days": 60, "public_only": true, "max": 400 }
+// include/exclude test the title and description; where tests the event's place (e.g. a team's home
+// city, so a sports schedule keeps only home games).
 import ical, { type VEvent } from "node-ical";
 import type { EventCategory } from "./types";
 import type { LinkedEvent } from "./eventApis";
 
-export interface FeedOptions { include?: string; exclude?: string; days?: number; public_only?: boolean; max?: number }
+export interface FeedOptions { include?: string; exclude?: string; where?: string; days?: number; public_only?: boolean; max?: number }
 
 /** A feed event, before it's given a venue. */
 export interface FeedEvent extends LinkedEvent {
@@ -39,6 +41,9 @@ const NOISE = new RegExp([
   "registration", "waitlist", "permitted", "admission", "dissertation", "defense", "senate", "vote center",
   "daylight saving", "test event", "rehearsals?", "flu (shots?|vaccines?|clinics?)", "blood drive", "chapel service",
   "\\((christian|jewish|muslim|islamic|hindu|buddhist|sikh|bah[aá]'?[ií]|orthodox|catholic)\\)",
+  // Holidays on their own, suspended entries, city services.
+  "^(veterans|thanksgiving|christmas|new year'?s|memorial|labor|independence|presidents'?|columbus|indigenous peoples'?|martin luther king,? jr\\.?|mlk) day$",
+  "suspended", "bulky item",
 ].join("|"), "i");
 
 const CATEGORY: [EventCategory, RegExp][] = [
@@ -89,6 +94,7 @@ function keep(e: FeedEvent, opts: FeedOptions, now: number): boolean {
   if (!e.title || Date.parse(e.starts_at) < now - 6 * 3600_000) return false;
   if (opts.include && !new RegExp(opts.include, "i").test(hay)) return false;
   if (opts.exclude && new RegExp(opts.exclude, "i").test(hay)) return false;
+  if (opts.where && !new RegExp(opts.where, "i").test(`${e.venue_name ?? ""} ${e.address ?? ""}`)) return false;
   return !NOISE.test(e.title);
 }
 

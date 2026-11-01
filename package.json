@@ -24,7 +24,8 @@
     "ticketmaster:venues": "tsx scripts/ticketmaster-venues.ts",
     "migrate": "tsx scripts/migrate.ts",
     "screenshots": "tsx SC_2_Afoot/run.ts",
-    "sources:import": "tsx scripts/import-sources.ts"
+    "sources:import": "tsx scripts/import-sources.ts",
+    "recurring": "tsx scripts/recurring.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.65.0",

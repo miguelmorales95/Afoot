@@ -40,15 +40,22 @@ async function venueOf(f: FeedRow, e: LinkedEvent): Promise<string | null> {
 }
 
 export async function runFeeds(log: (s: string) => void = console.log, only?: string) {
-  let q = supabase.from("event_feeds").select("*").eq("active", true);
+  let q = supabase.from("event_feeds").select("*").eq("active", true).order("created_at");
   if (only) q = q.or(`label.ilike.%${only.replace(/[%,()]/g, " ")}%,ref.eq.${only.replace(/[,()]/g, "")}`);
   const { data: feeds, error } = await q;
   if (error) throw error;
+  // Calendars that share items (the Valley's neighborhood councils publish one regional calendar)
+  // list each one once: the first feed to carry it keeps it.
+  const seen = new Set<string>();
   for (const f of (feeds ?? []) as FeedRow[]) {
     let result: string;
     try {
-      const events = await eventsOf(f);
-      if (typeof events === "string") { log(`- ${f.label ?? f.ref}: ${events}`); continue; }
+      const all = await eventsOf(f);
+      if (typeof all === "string") { log(`- ${f.label ?? f.ref}: ${all}`); continue; }
+      const events = CALENDAR_KINDS.has(f.kind) ? all.filter((e) => {
+        const key = `${e.title.toLowerCase()}|${e.starts_at.slice(0, 16)}`;
+        return seen.has(key) ? false : (seen.add(key), true);
+      }) : all;
       // Group by venue, then by title: the same title on several dates is one event with several dates.
       const byVenue = new Map<string, LinkedEvent[]>();
       let placeless = 0;
