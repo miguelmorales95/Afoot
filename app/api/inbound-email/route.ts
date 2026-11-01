@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { simpleParser } from "mailparser";
 import { queueInboundEmail, type InboundEmail } from "@/lib/newsletter";
+import { supabase } from "@/lib/supabase";
 
 // Inbound newsletter webhook. The Cloudflare Email Worker (docs/cloudflare-email-worker.js) posts
 // each email here as raw MIME (Content-Type: message/rfc822). JSON or form posts from other
@@ -49,7 +50,8 @@ async function fromMime(raw: Buffer): Promise<InboundEmail> {
     subject: parsed.subject ?? null,
     text: parsed.text ?? null,
     html: typeof parsed.html === "string" ? parsed.html : null,
-    receivedAt: parsed.date?.toISOString() ?? null,
+    // A malformed Date header parses to an invalid date: use the time it arrived instead.
+    receivedAt: parsed.date && !Number.isNaN(parsed.date.getTime()) ? parsed.date.toISOString() : null,
   };
 }
 
@@ -81,7 +83,9 @@ export async function POST(req: NextRequest) {
         receivedAt: pick(body, ["receivedAt", "Date", "date", "timestamp"]),
       };
     }
-  } catch {
+  } catch (err) {
+    console.error("inbound-email parse error:", (err as Error).message);
+    await saveFailure(null, `couldn't read the email: ${(err as Error).message}`);
     return NextResponse.json({ error: "invalid body" }, { status: 400 });
   }
 
@@ -92,6 +96,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, status: result.status });
   } catch (err) {
     console.error("inbound-email error:", (err as Error).message);
+    await saveFailure(email, (err as Error).message);
     return NextResponse.json({ error: "processing failed" }, { status: 500 });
   }
+}
+
+/** Records a failed email (who, what, why) for /admin → Newsletters. The worker still forwards the
+ *  email itself to FORWARD_TO, so nothing is lost; this says why it didn't go through. */
+async function saveFailure(email: InboundEmail | null, why: string) {
+  try {
+    await supabase.from("inbound_emails").insert({
+      from_address: email?.from || "unknown", from_name: email?.fromName?.slice(0, 200) ?? null,
+      subject: email?.subject?.slice(0, 500) ?? null, received_at: new Date().toISOString(),
+      status: "error", note: why.slice(0, 500),
+    });
+  } catch { /* nothing more to do: the worker forwards the email */ }
 }

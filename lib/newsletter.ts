@@ -159,6 +159,10 @@ export async function queueInboundEmail(email: InboundEmail): Promise<ProcessRes
     if (existing) return { status: "duplicate" };
   }
   const confirm = confirmLinks(email);
+  // Postgres text can't hold NUL characters, which some mailing-list HTML contains.
+  const nul = /\u0000/g;
+  email = { ...email, text: email.text?.replace(nul, "") ?? null, html: email.html?.replace(nul, "") ?? null,
+    subject: email.subject?.replace(nul, "") ?? null, fromName: email.fromName?.replace(nul, "") ?? null };
   const { data, error } = await supabase.from("inbound_emails").insert({
     message_id: email.messageId ?? null,
     from_address: email.from,
