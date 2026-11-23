@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuthed } from "@/lib/adminAuth";
 import {
-  fillAddress, fillPrice, getSetting, queue, setSetting, skipVenue, suggestAddress, updateOutreach, venueStats,
+  fillAddress, getSetting, queue, setSetting, skipVenue, suggestAddress, updateGuide, updateOutreach, venueStats,
 } from "@/lib/founderQueue";
 
 // The founder queue. Protected by ADMIN_TOKEN.
@@ -9,7 +9,9 @@ import {
 //   GET ?view=outreach        -> { venues }  (venues with upcoming dates, most dates first)
 //   GET ?view=settings        -> { rankingPrompt, weeklyPlan }
 //   GET ?suggest=<venueId>    -> { address }  (a map lookup of the venue's name)
-//   POST { action: "address" | "price", venueId, value, dates }
+//   POST { action: "address", venueId, value, dates }
+//   POST { action: "price", venueId, value, dates }          -> the venue's usual price
+//   POST { action: "guide", venueId, field, value }          -> default_price | parking | good_to_know
 //   POST { action: "skip", venueId }
 //   POST { action: "outreach", venueId, status?, contacted?, notes? }
 //   POST { action: "prompt", value }
@@ -43,7 +45,8 @@ export async function POST(req: NextRequest) {
   try {
     switch (b.action) {
       case "address": return NextResponse.json({ ok: true, ...(await fillAddress(b.venueId, value, dates)) });
-      case "price": await fillPrice(b.venueId, value, dates); break;
+      case "price": await updateGuide(b.venueId, "default_price", value, dates); break;
+      case "guide": await updateGuide(b.venueId, String(b.field), value); break;
       case "skip": await skipVenue(b.venueId); break;
       case "outreach":
         await updateOutreach(b.venueId, { status: b.status, contacted: Boolean(b.contacted), notes: typeof b.notes === "string" ? b.notes : undefined });

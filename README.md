@@ -162,9 +162,12 @@ admin routes refuse everyone on a deployed site (they're open only in local deve
 ### Founder queue and emails (`/admin/queue`, `npm run digest`)
 
 A phone-first page with one card at a time. Most gaps are per venue, so each card is one venue
-missing an **address** (saved with a map pin) or a **price** (saved as `venues.default_price` and
-written to every event there with none; a database trigger keeps known prices through re-imports).
-**Venues** tracks in-person pitching (status, times contacted, notes). **AI prompt** is the ranking
+missing an **address** (saved with a map pin) or a **price**. A price answer goes in the **venue
+guide** (`venues.default_price`, with `parking` and `good_to_know`): the event's own post always
+wins, and `nearby_events` falls back to the guide only when the post says nothing, flagged
+`price_is_usual` so the site shows "usually Free". A trigger keeps an event's last posted price
+through re-imports that drop it. **Venues** edits the guide and tracks in-person pitching (status,
+times contacted, private notes in the server-only `venue_outreach` table). **AI prompt** is the ranking
 guidance the emails follow, stored in `founder_settings`. `.github/workflows/founder-digest.yml` runs
 `npm run digest` at 7 a.m. LA: Monday plan, Thursday check-in, Saturday ideas and where to pitch,
 and on other days an email only when a high-traffic event in the next week is missing details.

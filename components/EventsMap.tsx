@@ -74,7 +74,7 @@ function VenuePopup({ g }: { g: VenueGroup }) {
             )}
             <div style={{ color: "rgba(255,255,255,.5)" }}>
               {formatShortDate(e.starts_at)} · {formatTime(e.starts_at)}
-              {e.price ? ` · ${e.price}` : ""}
+              {e.price ? ` · ${e.price_is_usual ? "usually " : ""}${e.price}` : ""}
             </div>
           </div>
         );

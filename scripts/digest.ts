@@ -37,7 +37,7 @@ interface ResearchItem { eventId: string; title: string; venue: string; startsAt
 /** Events in the next `days` days missing an address or price, not asked about before. */
 async function researchCandidates(days: number): Promise<ResearchItem[]> {
   const { data, error } = await supabase.from("event_occurrences")
-    .select("starts_at, event:events(id,title,url,source_url,price,category,status,venue:venues(name,address,lat))")
+    .select("starts_at, event:events(id,title,url,source_url,price,category,status,venue:venues(name,address,lat,default_price))")
     .gte("starts_at", new Date().toISOString()).lte("starts_at", new Date(Date.now() + days * DAY).toISOString())
     .eq("cancelled", false).order("starts_at").limit(3000);
   if (error) throw new Error(error.message);
@@ -47,7 +47,7 @@ async function researchCandidates(days: number): Promise<ResearchItem[]> {
   for (const o of data as unknown as { starts_at: string; event: Record<string, any> | null }[]) { // eslint-disable-line @typescript-eslint/no-explicit-any
     const e = o.event;
     if (!e || e.status !== "active" || seen.has(e.id)) continue;
-    const missing = [!e.venue?.address && "address", !e.price?.trim() && "cost", e.venue?.lat == null && e.venue?.address && "map pin"].filter(Boolean) as string[];
+    const missing = [!e.venue?.address && "address", !e.price?.trim() && !e.venue?.default_price?.trim() && "cost", e.venue?.lat == null && e.venue?.address && "map pin"].filter(Boolean) as string[];
     if (!missing.length) continue;
     seen.add(e.id);
     out.push({ eventId: e.id, title: e.title, venue: e.venue?.name ?? "?", startsAt: o.starts_at, link: e.url || e.source_url, missing, category: e.category });

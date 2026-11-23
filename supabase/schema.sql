@@ -289,6 +289,7 @@ returns table (
   description            text,
   category               text,
   price                  text,
+  price_is_usual         boolean,    -- price is the venue's usual price, not from the event's post
   url                    text,
   recurrence_description text,
   is_recurring           boolean,
@@ -300,11 +301,13 @@ returns table (
   venue_address          text,
   venue_lat              double precision,
   venue_lng              double precision,
+  venue_parking          text,
+  venue_good_to_know     text,
   distance_km            double precision,
   confidence             text,
   uncertain_fields       text[],
   cancelled              boolean,
-  heads_up               jsonb      -- {"parking": 3, "great_vibe": 5}, from people who went
+  heads_up               jsonb
 )
 language sql
 stable
@@ -314,11 +317,13 @@ as $$
     select
       o.id as occurrence_id,
       e.id as event_id,
-      e.title, e.description, e.category, e.price, e.url,
-      e.recurrence_description, e.is_recurring, e.tags,
+      e.title, e.description, e.category,
+      coalesce(nullif(btrim(e.price), ''), nullif(btrim(v.default_price), '')) as price,
+      (nullif(btrim(e.price), '') is null and nullif(btrim(v.default_price), '') is not null) as price_is_usual,
+      e.url, e.recurrence_description, e.is_recurring, e.tags,
       o.starts_at, o.ends_at,
       v.id as venue_id, v.name as venue_name, v.address as venue_address,
-      v.lat as venue_lat, v.lng as venue_lng,
+      v.lat as venue_lat, v.lng as venue_lng, v.parking as venue_parking, v.good_to_know as venue_good_to_know,
       (6371 * acos(
         least(1, greatest(-1,
           cos(radians(in_lat)) * cos(radians(v.lat)) *
@@ -335,7 +340,6 @@ as $$
     left join (
       select occurrence_id, count(*)::bigint as c from rsvps group by occurrence_id
     ) r on r.occurrence_id = o.id
-    -- Heads-up tips apply to the whole series (parking doesn't change week to week).
     left join (
       select event_id, jsonb_object_agg(reason, n) as tips
       from (
@@ -352,10 +356,10 @@ as $$
       and o.starts_at <= now() + make_interval(days => in_days_ahead)
   )
   select
-    occurrence_id, event_id, title, description, category, price, url,
+    occurrence_id, event_id, title, description, category, price, price_is_usual, url,
     recurrence_description, is_recurring, tags, starts_at, ends_at,
-    venue_id, venue_name, venue_address, venue_lat, venue_lng, distance_km,
-    confidence, uncertain_fields, cancelled, heads_up
+    venue_id, venue_name, venue_address, venue_lat, venue_lng, venue_parking, venue_good_to_know,
+    distance_km, confidence, uncertain_fields, cancelled, heads_up
   from scored
   where distance_km <= in_radius_km
   order by (starts_at at time zone 'America/Los_Angeles')::date asc,
@@ -804,3 +808,53 @@ Never hold an event back because it is soon. If a high-traffic event is soon and
 Prefer fixes that complete many dates at once (one venue address or venue-wide price).
 For in-person promotion, pick venues that have not said yes (paying) or no yet, clustered so one trip covers several.')
 on conflict (key) do nothing;
+
+-- Venue guide; outreach moved to venue_outreach (migrations/20261123100000_venue_guide.sql)
+-- ===========================================================================
+-- Venue guide: what a venue usually charges (venues.default_price), parking, and other
+-- good-to-know notes. The event's own post always wins; the guide fills in only when the
+-- post doesn't say, and the site labels that price as usual ("usually Free").
+--
+-- Also moves outreach tracking off `venues` (the public can read venues) into a
+-- server-only table.
+-- ===========================================================================
+
+create table if not exists afoot.venue_outreach (
+  venue_id   uuid primary key references afoot.venues(id) on delete cascade,
+  status     text not null default 'not_contacted'
+             check (status in ('not_contacted', 'contacted', 'talking', 'paying', 'declined')),
+  contacts   int not null default 0,
+  last_at    timestamptz,
+  notes      text,
+  skip_until timestamptz,             -- "Skip a week" on a queue card
+  updated_at timestamptz default now()
+);
+alter table afoot.venue_outreach enable row level security;
+
+insert into afoot.venue_outreach (venue_id, status, contacts, last_at, notes, skip_until)
+  select id, outreach_status, outreach_count, outreach_last_at, outreach_notes, queue_skip_until
+  from afoot.venues
+  where outreach_status <> 'not_contacted' or outreach_count > 0 or outreach_notes is not null or queue_skip_until is not null
+on conflict (venue_id) do nothing;
+
+alter table afoot.venues drop constraint if exists venues_outreach_status_check;
+alter table afoot.venues drop column if exists outreach_status;
+alter table afoot.venues drop column if exists outreach_count;
+alter table afoot.venues drop column if exists outreach_last_at;
+alter table afoot.venues drop column if exists outreach_notes;
+alter table afoot.venues drop column if exists queue_skip_until;
+
+alter table afoot.venues add column if not exists parking text;
+alter table afoot.venues add column if not exists good_to_know text;
+comment on column afoot.venues.default_price is 'Usual price, used only when an event''s own post gives none';
+
+-- An event keeps the last price its own post gave when a re-import has none. The venue's
+-- usual price is never copied in; nearby_events falls back to it when reading.
+create or replace function afoot.keep_event_price() returns trigger
+language plpgsql set search_path = afoot as $$
+begin
+  if new.price is null or btrim(new.price) = '' then
+    new.price := case when tg_op = 'UPDATE' then nullif(btrim(old.price), '') end;
+  end if;
+  return new;
+end $$;

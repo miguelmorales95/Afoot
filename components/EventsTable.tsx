@@ -113,7 +113,7 @@ export default function EventsTable({ events }: { events: NearbyEvent[] }) {
                     {cat.emoji} {cat.label}
                   </span>
                 </td>
-                <td className="whitespace-nowrap px-4 py-3 text-white/70">{e.price ?? "—"}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-white/70">{e.price ? `${e.price_is_usual ? "usually " : ""}${e.price}` : "—"}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-white/70">
                   {formatDistance(e.distance_km)}
                 </td>

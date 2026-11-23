@@ -1,6 +1,8 @@
 // The founder queue (/admin/queue) and the facts the founder emails are written from.
 // Gaps are mostly per venue (one missing address hides hundreds of dates), so cards are
 // per venue and one answer fixes every upcoming date there.
+// Venue guide: a venue's usual price, parking and notes fill in only when an event's own post
+// doesn't say (nearby_events falls back to them; the event's own price always wins).
 import { supabase } from "./supabase";
 import { geocode } from "./geocode";
 import { LAUNCH_AREAS } from "./areas";
@@ -8,6 +10,8 @@ import { LAUNCH_AREAS } from "./areas";
 const DAY = 864e5;
 export const OUTREACH_STATUSES = ["not_contacted", "contacted", "talking", "paying", "declined"] as const;
 export type OutreachStatus = (typeof OUTREACH_STATUSES)[number];
+export const GUIDE_FIELDS = ["default_price", "parking", "good_to_know"] as const;
+export type GuideField = (typeof GUIDE_FIELDS)[number];
 
 export interface VenueStat {
   id: string;
@@ -19,7 +23,9 @@ export interface VenueStat {
   lat: number | null;
   lng: number | null;
   area: string | null;
-  default_price: string | null;
+  default_price: string | null;   // usual price
+  parking: string | null;
+  good_to_know: string | null;
   outreach_status: OutreachStatus;
   outreach_count: number;
   outreach_last_at: string | null;
@@ -27,10 +33,10 @@ export interface VenueStat {
   skipped: boolean;
   dates: number;          // upcoming dates in the next 60 days
   soonDates: number;      // ... in the next 14 days
-  noPriceDates: number;
+  noPriceDates: number;   // dates with no price from the post and no usual price
   nextAt: string | null;
   titles: string[];       // a few upcoming event titles
-  knownPrices: string[];  // prices already on this venue's events, as hints
+  knownPrices: string[];  // prices the venue's own posts give, as hints
 }
 
 export interface QueueCard {
@@ -66,7 +72,17 @@ async function upcomingOccurrences() {
   return rows.filter((r) => r.event?.status === "active");
 }
 
-/** Every venue with upcoming dates, with its gaps and outreach record. */
+async function inChunks<T>(ids: string[], fetch: (chunk: string[]) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>) {
+  const out: T[] = [];
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data, error } = await fetch(ids.slice(i, i + 200));
+    if (error) throw new Error(error.message);
+    out.push(...(data ?? []));
+  }
+  return out;
+}
+
+/** Every venue with upcoming dates, with its gaps, guide and outreach record. */
 export async function venueStats(): Promise<VenueStat[]> {
   const occ = await upcomingOccurrences();
   const soon = Date.now() + 14 * DAY;
@@ -82,24 +98,23 @@ export async function venueStats(): Promise<VenueStat[]> {
     if (a.titles.size < 4) a.titles.add(e.title);
   }
   const ids = [...agg.keys()];
-  const venues: Record<string, unknown>[] = [];
-  for (let i = 0; i < ids.length; i += 200) {
-    const { data, error } = await supabase.from("venues")
-      .select("id,name,website,events_url,address,city,lat,lng,active,default_price,outreach_status,outreach_count,outreach_last_at,outreach_notes,queue_skip_until")
-      .in("id", ids.slice(i, i + 200));
-    if (error) throw new Error(error.message);
-    venues.push(...data);
-  }
+  type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const [venues, outreach] = await Promise.all([
+    inChunks<Row>(ids, (c) => supabase.from("venues").select("id,name,website,events_url,address,city,lat,lng,default_price,parking,good_to_know").in("id", c)),
+    inChunks<Row>(ids, (c) => supabase.from("venue_outreach").select("*").in("venue_id", c)),
+  ]);
+  const out = new Map(outreach.map((o) => [o.venue_id as string, o]));
   const now = Date.now();
   return venues.map((v) => {
-    const a = agg.get(v.id as string)!;
+    const a = agg.get(v.id)!, o = out.get(v.id);
     return {
       id: v.id, name: v.name, website: v.website, events_url: v.events_url, address: v.address, city: v.city,
-      lat: v.lat, lng: v.lng, area: nearestArea(v.lat as number | null, v.lng as number | null),
-      default_price: v.default_price, outreach_status: v.outreach_status, outreach_count: v.outreach_count,
-      outreach_last_at: v.outreach_last_at, outreach_notes: v.outreach_notes,
-      skipped: Boolean(v.queue_skip_until && Date.parse(v.queue_skip_until as string) > now),
-      dates: a.dates, soonDates: a.soonDates, noPriceDates: a.noPriceDates, nextAt: a.nextAt,
+      lat: v.lat, lng: v.lng, area: nearestArea(v.lat, v.lng),
+      default_price: v.default_price, parking: v.parking, good_to_know: v.good_to_know,
+      outreach_status: o?.status ?? "not_contacted", outreach_count: o?.contacts ?? 0,
+      outreach_last_at: o?.last_at ?? null, outreach_notes: o?.notes ?? null,
+      skipped: Boolean(o?.skip_until && Date.parse(o.skip_until) > now),
+      dates: a.dates, soonDates: a.soonDates, noPriceDates: v.default_price?.trim() ? 0 : a.noPriceDates, nextAt: a.nextAt,
       titles: [...a.titles], knownPrices: [...a.prices],
     } as VenueStat;
   });
@@ -172,48 +187,51 @@ export async function fillAddress(venueId: string, address: string, dates = 0) {
   return { geocoded: Boolean(g) };
 }
 
-/** Sets the venue's default and fills every event there that has no price. */
-export async function fillPrice(venueId: string, price: string, dates = 0) {
-  const clean = price.trim().slice(0, 60);
-  if (!clean) throw new Error("Price is empty");
-  const { error } = await supabase.from("venues").update({ default_price: clean }).eq("id", venueId);
+/** Sets one venue-guide field (usual price, parking, good to know); empty clears it. */
+export async function updateGuide(venueId: string, field: string, value: string, dates = 0) {
+  if (!GUIDE_FIELDS.includes(field as GuideField)) throw new Error("Unknown field");
+  const clean = value.trim().slice(0, field === "default_price" ? 60 : 500) || null;
+  const { error } = await supabase.from("venues").update({ [field]: clean }).eq("id", venueId);
   if (error) throw new Error(error.message);
-  const { error: e2 } = await supabase.from("events").update({ price: clean, updated_at: new Date().toISOString() })
-    .eq("venue_id", venueId).or("price.is.null,price.eq.");
-  if (e2) throw new Error(e2.message);
-  await logAction("price", venueId, clean, dates);
+  await logAction(field === "default_price" ? "price" : "guide", venueId, `${field}: ${clean ?? "(cleared)"}`, dates);
+}
+
+async function upsertOutreach(venueId: string, patch: Record<string, unknown>) {
+  const { error } = await supabase.from("venue_outreach")
+    .upsert({ venue_id: venueId, ...patch, updated_at: new Date().toISOString() }, { onConflict: "venue_id" });
+  if (error) throw new Error(error.message);
 }
 
 export async function skipVenue(venueId: string) {
-  await supabase.from("venues").update({ queue_skip_until: new Date(Date.now() + 7 * DAY).toISOString() }).eq("id", venueId);
+  await upsertOutreach(venueId, { skip_until: new Date(Date.now() + 7 * DAY).toISOString() });
   await logAction("skip", venueId, "skipped for a week");
 }
 
 export async function updateOutreach(venueId: string, p: { status?: string; contacted?: boolean; notes?: string }) {
+  const { data: cur } = await supabase.from("venue_outreach").select("status,contacts").eq("venue_id", venueId).maybeSingle();
   const patch: Record<string, unknown> = {};
   if (p.status) {
     if (!OUTREACH_STATUSES.includes(p.status as OutreachStatus)) throw new Error("Unknown status");
-    patch.outreach_status = p.status;
+    patch.status = p.status;
   }
-  if (p.notes !== undefined) patch.outreach_notes = p.notes.slice(0, 1000);
+  if (p.notes !== undefined) patch.notes = p.notes.slice(0, 1000);
   if (p.contacted) {
-    const { data } = await supabase.from("venues").select("outreach_count,outreach_status").eq("id", venueId).single();
-    patch.outreach_count = (data?.outreach_count ?? 0) + 1;
-    patch.outreach_last_at = new Date().toISOString();
-    if (!p.status && data?.outreach_status === "not_contacted") patch.outreach_status = "contacted";
+    patch.contacts = (cur?.contacts ?? 0) + 1;
+    patch.last_at = new Date().toISOString();
+    if (!p.status && (cur?.status ?? "not_contacted") === "not_contacted") patch.status = "contacted";
   }
-  const { error } = await supabase.from("venues").update(patch).eq("id", venueId);
-  if (error) throw new Error(error.message);
+  await upsertOutreach(venueId, patch);
   await logAction("outreach", venueId, JSON.stringify(p).slice(0, 300));
 }
 
 /** What the founder fixed since a time, for "you did this" lines in the emails. */
 export async function actionsSince(sinceIso: string) {
   const { data } = await supabase.from("founder_actions").select("kind,dates").gte("created_at", sinceIso);
-  const out = { addresses: 0, prices: 0, datesFixed: 0, outreach: 0 };
+  const out = { addresses: 0, prices: 0, guideNotes: 0, datesFixed: 0, outreach: 0 };
   for (const a of data ?? []) {
     if (a.kind === "address") out.addresses++;
     if (a.kind === "price") out.prices++;
+    if (a.kind === "guide") out.guideNotes++;
     if (a.kind === "outreach") out.outreach++;
     out.datesFixed += a.dates ?? 0;
   }

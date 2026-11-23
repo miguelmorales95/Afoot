@@ -388,8 +388,15 @@ function EventCard({ ev, feedback, featured }: { ev: NearbyEvent; feedback: bool
         )}
         <p className="mt-0.5 text-sm text-white/55">
           {ev.venue_name} · {formatDistance(ev.distance_km)} away
-          {ev.price ? ` · ${ev.price}` : ""}
+          {ev.price ? ` · ${ev.price_is_usual ? "usually " : ""}${ev.price}` : ""}
         </p>
+        {(ev.venue_parking || ev.venue_good_to_know) && (
+          <p className="mt-0.5 text-xs text-white/40">
+            {ev.venue_parking ? `🅿️ ${ev.venue_parking}` : ""}
+            {ev.venue_parking && ev.venue_good_to_know ? " · " : ""}
+            {ev.venue_good_to_know ? `ℹ️ ${ev.venue_good_to_know}` : ""}
+          </p>
+        )}
         {(ev.cancelled || !!ev.uncertain_fields?.length) && (
           <div className="mt-1.5 flex flex-wrap gap-1"><UnconfirmedBadges ev={ev} /></div>
         )}

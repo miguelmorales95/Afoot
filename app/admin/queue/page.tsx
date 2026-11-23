@@ -14,7 +14,7 @@ const STATUSES = [
 
 interface Venue {
   id: string; name: string; website: string | null; events_url: string | null; address: string | null; city: string | null;
-  area: string | null; outreach_status: string; outreach_count: number; outreach_last_at: string | null; outreach_notes: string | null;
+  area: string | null; default_price: string | null; parking: string | null; good_to_know: string | null; outreach_status: string; outreach_count: number; outreach_last_at: string | null; outreach_notes: string | null;
   dates: number; soonDates: number; noPriceDates: number; nextAt: string | null; titles: string[]; knownPrices: string[];
 }
 interface Card { kind: "address" | "price"; venue: Venue; fixes: number; planned: boolean }
@@ -113,7 +113,7 @@ function QueueCard({ card, onDone, api }: { card: Card; onDone: (fixed: number) 
           </div>
           <input value={value} onChange={(e) => setValue(e.target.value)} placeholder="or type it, e.g. $12 advance"
             className="mt-3 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-base outline-none focus:border-fuchsia-500/50" />
-          <p className="mt-2 text-xs text-white/40">Applies to every event here with no price, and to new ones.</p>
+          <p className="mt-2 text-xs text-white/40">Saved as this venue&apos;s usual price. An event&apos;s own post always wins; otherwise the site shows &ldquo;usually …&rdquo;.</p>
         </div>
       )}
 
@@ -164,13 +164,30 @@ function QueueTab({ api }: { api: ReturnType<typeof useApi> }) {
   );
 }
 
+const GUIDE = [
+  ["default_price", "Usual price", "e.g. Free, $15, $10 advance / $15 door"],
+  ["parking", "Parking", "e.g. Free lot behind; street parking after 6pm"],
+  ["good_to_know", "Good to know", "e.g. 21+, cash only, wheelchair access on the side"],
+] as const;
+
 function OutreachRow({ v, api }: { v: Venue; api: ReturnType<typeof useApi> }) {
   const [row, setRow] = useState(v);
   const [notes, setNotes] = useState(v.outreach_notes ?? "");
+  const [guide, setGuide] = useState({ default_price: v.default_price ?? "", parking: v.parking ?? "", good_to_know: v.good_to_know ?? "" });
   const [open, setOpen] = useState(false);
+  const [saved, setSaved] = useState(false);
   const save = async (patch: Record<string, unknown>, local: Partial<Venue>) => {
     setRow((r) => ({ ...r, ...local }));
     await api.post({ action: "outreach", venueId: v.id, ...patch }).catch(() => {});
+  };
+  const saveAll = async () => {
+    setSaved(false);
+    for (const [field] of GUIDE) {
+      if ((row[field] ?? "") !== guide[field]) await api.post({ action: "guide", venueId: v.id, field, value: guide[field] }).catch(() => {});
+    }
+    if ((row.outreach_notes ?? "") !== notes) await api.post({ action: "outreach", venueId: v.id, notes }).catch(() => {});
+    setRow((r) => ({ ...r, ...guide, outreach_notes: notes }));
+    setSaved(true);
   };
   return (
     <li className="rounded-2xl border border-white/10 p-3">
@@ -178,6 +195,7 @@ function OutreachRow({ v, api }: { v: Venue; api: ReturnType<typeof useApi> }) {
         <button onClick={() => setOpen(!open)} className="min-w-0 text-left">
           <div className="truncate font-semibold">{row.name}</div>
           <div className="text-xs text-white/50">{row.area || row.city || "LA"} · {row.dates} dates · contacted {row.outreach_count}× ({ago(row.outreach_last_at)})</div>
+          {row.default_price && <div className="text-xs text-emerald-300/80">usually {row.default_price}{row.parking ? " · parking noted" : ""}</div>}
         </button>
         <button onClick={() => save({ contacted: true }, { outreach_count: row.outreach_count + 1, outreach_last_at: new Date().toISOString(), outreach_status: row.outreach_status === "not_contacted" ? "contacted" : row.outreach_status })}
           className="shrink-0 rounded-full bg-white/10 px-3 py-2 text-xs font-semibold">+1 contact</button>
@@ -187,11 +205,20 @@ function OutreachRow({ v, api }: { v: Venue; api: ReturnType<typeof useApi> }) {
         {STATUSES.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
       </select>
       {open && (
-        <div className="mt-2">
-          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Who you talked to, what they said"
-            className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm" />
-          <button onClick={() => save({ notes }, { outreach_notes: notes })} className="mt-1 text-xs text-fuchsia-300 underline">Save notes</button>
-          {row.address && <p className="mt-1 text-xs text-white/40">{row.address}</p>}
+        <div className="mt-3 space-y-2">
+          {row.address && <p className="text-xs text-white/40">{row.address}</p>}
+          <p className="text-[11px] uppercase tracking-wide text-white/40">Shown on the site when an event&apos;s own post doesn&apos;t say</p>
+          {GUIDE.map(([field, label, hint]) => (
+            <label key={field} className="block text-xs text-white/60">{label}
+              <input value={guide[field]} onChange={(e) => { setGuide({ ...guide, [field]: e.target.value }); setSaved(false); }} placeholder={hint}
+                className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white" />
+            </label>
+          ))}
+          <label className="block text-xs text-white/60">Pitch notes (private)
+            <textarea value={notes} onChange={(e) => { setNotes(e.target.value); setSaved(false); }} rows={2} placeholder="Who you talked to, what they said"
+              className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white" />
+          </label>
+          <button onClick={saveAll} className="w-full rounded-full bg-fuchsia-600 px-4 py-2.5 text-sm font-semibold">{saved ? "Saved ✓" : "Save"}</button>
         </div>
       )}
     </li>
@@ -205,14 +232,15 @@ function OutreachTab({ api }: { api: ReturnType<typeof useApi> }) {
   useEffect(() => { api.get("?view=outreach").then((d) => setVenues(d.venues), () => setVenues([])); }, [api]);
   if (!venues) return <p className="mt-8 text-white/40">Loading venues…</p>;
   const shown = venues.filter((v) =>
-    (filter === "all" || (filter === "open" ? !["paying", "declined"].includes(v.outreach_status) : v.outreach_status === filter)) &&
+    (filter === "all" || (filter === "guide" ? Boolean(v.default_price || v.parking || v.good_to_know)
+      : filter === "open" ? !["paying", "declined"].includes(v.outreach_status) : v.outreach_status === filter)) &&
     (!q || `${v.name} ${v.area ?? ""} ${v.city ?? ""}`.toLowerCase().includes(q.toLowerCase())));
   return (
     <div className="mt-6">
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search venue or area"
         className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-base" />
       <div className="mt-3 flex flex-wrap gap-2">
-        {[["open", "Not yes/no yet"], ["paying", "Paying"], ["declined", "Said no"], ["all", "All"]].map(([k, l]) => (
+        {[["open", "Not yes/no yet"], ["guide", "Has venue info"], ["paying", "Paying"], ["declined", "Said no"], ["all", "All"]].map(([k, l]) => (
           <button key={k} onClick={() => setFilter(k)} className={chip(filter === k)}>{l}</button>
         ))}
       </div>

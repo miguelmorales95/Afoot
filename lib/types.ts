@@ -19,6 +19,8 @@ export interface NearbyEvent {
   description: string | null;
   category: EventCategory | null;
   price: string | null;
+  /** The price is the venue's usual price (the event's own post gave none). */
+  price_is_usual?: boolean;
   url: string | null;
   recurrence_description: string | null;
   is_recurring: boolean;
@@ -30,6 +32,8 @@ export interface NearbyEvent {
   venue_address: string | null;
   venue_lat: number;
   venue_lng: number;
+  venue_parking?: string | null;
+  venue_good_to_know?: string | null;
   distance_km: number;
   // Attendance (going count) is intentionally NOT exposed to clients — it's
   // used only server-side for ranking and to gate the event chat.
