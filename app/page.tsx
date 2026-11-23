@@ -16,6 +16,7 @@ import AdUnit from "@/components/AdUnit";
 import GoingButton from "@/components/GoingButton";
 import EventFeedback, { UnconfirmedBadges } from "@/components/EventFeedback";
 import VenueMiniMap from "@/components/VenueMiniMap";
+import DateRangePicker from "@/components/DateRangePicker";
 import { LAUNCH_AREAS, type LaunchArea } from "@/lib/areas";
 import { areaForLocation, campaignsFor, type LiveCampaign } from "@/lib/ads";
 import { useLiveCampaigns, useSeen } from "@/lib/sponsorClient";
@@ -62,7 +63,8 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [heroOpen, setHeroOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [mapDay, setMapDay] = useState<string | null>(null);
+  const [mapRange, setMapRange] = useState<{ start: string; end: string } | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const controlsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -216,7 +218,9 @@ export default function Home() {
     requestAnimationFrame(() => controlsRef.current?.scrollIntoView({ block: "start" }));
 
   const openMap = (day?: string) => {
-    setMapDay(day ?? todayKey());
+    const d = day ?? todayKey();
+    setMapRange({ start: d, end: d });
+    setPickerOpen(false);
     setView("map");
     scrollToControls();
   };
@@ -229,9 +233,25 @@ export default function Home() {
     }
   };
 
-  const shownDay = mapDay ?? todayKey();
+  const rangeStart = mapRange?.start ?? todayKey();
+  const rangeEnd = mapRange?.end ?? rangeStart;
   const lastDay = grouped.length ? grouped[grouped.length - 1][0] : todayKey();
-  const mapEvents = useMemo(() => visible.filter((e) => eventDay(e) === shownDay), [visible, shownDay]);
+  const mapEvents = useMemo(
+    () => visible.filter((e) => { const k = eventDay(e); return k >= rangeStart && k <= rangeEnd; }),
+    [visible, rangeStart, rangeEnd],
+  );
+  const dayCounts = useMemo(() => {
+    const c: Record<string, number> = {};
+    for (const e of visible) { const k = eventDay(e); c[k] = (c[k] ?? 0) + 1; }
+    return c;
+  }, [visible]);
+  // The arrows move the whole window: a single day steps a day, a weekend steps to the next span.
+  const rangeLen = daysBetween(rangeStart, rangeEnd) + 1;
+  const stepRange = (dir: 1 | -1) => {
+    const shifted = shiftDay(rangeStart, dir * rangeLen);
+    const start = shifted < todayKey() ? todayKey() : shifted;
+    setMapRange({ start, end: shiftDay(start, rangeLen - 1) });
+  };
 
   const searchForm = (
     <form onSubmit={search} className="relative mx-auto w-full max-w-lg">
@@ -370,28 +390,47 @@ export default function Home() {
         <div>
           <div className="mb-2 flex items-center justify-between gap-2 rounded-full border border-white/10 bg-white/5 p-1">
             <button
-              onClick={() => setMapDay(shiftDay(shownDay, -1))}
-              disabled={shownDay <= todayKey()}
-              aria-label="Previous day"
+              onClick={() => stepRange(-1)}
+              disabled={rangeStart <= todayKey()}
+              aria-label={rangeLen === 1 ? "Previous day" : "Previous dates"}
               className="flex h-9 w-9 items-center justify-center rounded-full text-lg text-white/80 hover:bg-white/10 disabled:opacity-25 disabled:hover:bg-transparent"
             >
               ‹
             </button>
-            <p className="text-sm font-semibold" aria-live="polite">
-              {formatDayLabel(dayIso(shownDay))}
+            <button
+              onClick={() => setPickerOpen((o) => !o)}
+              aria-expanded={pickerOpen}
+              aria-label="Pick dates"
+              className="rounded-full px-3 py-1 text-sm font-semibold hover:bg-white/10"
+            >
+              <span aria-live="polite">
+                {rangeLen === 1 ? formatDayLabel(dayIso(rangeStart)) : `${monthDay(rangeStart)} – ${monthDay(rangeEnd)}`}
+              </span>
+              <span className="ml-1 text-xs text-white/40" aria-hidden>▾</span>
               <span className="ml-2 font-normal text-white/40">
                 {mapEvents.length === 0 ? "nothing posted" : `${mapEvents.length} ${mapEvents.length === 1 ? "event" : "events"}`}
               </span>
-            </p>
+            </button>
             <button
-              onClick={() => setMapDay(shiftDay(shownDay, 1))}
-              disabled={shownDay >= lastDay}
-              aria-label="Next day"
+              onClick={() => stepRange(1)}
+              disabled={rangeEnd >= lastDay}
+              aria-label={rangeLen === 1 ? "Next day" : "Next dates"}
               className="flex h-9 w-9 items-center justify-center rounded-full text-lg text-white/80 hover:bg-white/10 disabled:opacity-25 disabled:hover:bg-transparent"
             >
               ›
             </button>
           </div>
+          {pickerOpen && (
+            <DateRangePicker
+              min={todayKey()}
+              max={lastDay}
+              start={rangeStart}
+              end={rangeEnd}
+              counts={dayCounts}
+              onChange={(start, end) => setMapRange({ start, end })}
+              onClose={() => setPickerOpen(false)}
+            />
+          )}
           <EventsMap events={mapEvents} center={[loc.lat, loc.lng]} />
         </div>
       )}
@@ -546,6 +585,9 @@ function shiftDay(key: string, n: number) {
   d.setUTCDate(d.getUTCDate() + n);
   return dayKey(d.toISOString());
 }
+const daysBetween = (a: string, b: string) => Math.round((Date.parse(dayIso(b)) - Date.parse(dayIso(a))) / 86400000);
+const monthDay = (key: string) =>
+  new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(dayIso(key)));
 
 const placeName = (l: Loc) => (l.label === "your location" ? "you" : l.label);
 
