@@ -275,6 +275,12 @@ create table if not exists reports (
 -- ---------------------------------------------------------------------------
 
 -- Return type changed over time (confidence, heads-up tips); drop before recreating.
+-- Columns nearby_events reads that later sections add (SQL function bodies are checked when created).
+alter table venues add column if not exists default_price text;
+alter table venues add column if not exists parking text;
+alter table venues add column if not exists good_to_know text;
+alter table events add column if not exists traffic_score smallint check (traffic_score between 1 and 100);
+
 drop function if exists nearby_events(double precision, double precision, double precision, int);
 create or replace function nearby_events(
   in_lat        double precision,
@@ -304,6 +310,7 @@ returns table (
   venue_parking          text,
   venue_good_to_know     text,
   distance_km            double precision,
+  traffic_score          smallint,   -- 1–100, expected draw from the weekly ranking model; null until scored
   confidence             text,
   uncertain_fields       text[],
   cancelled              boolean,
@@ -332,6 +339,7 @@ as $$
         ))
       )) as distance_km,
       coalesce(r.c, 0) as going_count,
+      e.traffic_score,
       e.confidence, e.uncertain_fields, o.cancelled,
       coalesce(h.tips, '{}'::jsonb) as heads_up
     from event_occurrences o
@@ -359,11 +367,11 @@ as $$
     occurrence_id, event_id, title, description, category, price, price_is_usual, url,
     recurrence_description, is_recurring, tags, starts_at, ends_at,
     venue_id, venue_name, venue_address, venue_lat, venue_lng, venue_parking, venue_good_to_know,
-    distance_km, confidence, uncertain_fields, cancelled, heads_up
+    distance_km, traffic_score, confidence, uncertain_fields, cancelled, heads_up
   from scored
   where distance_km <= in_radius_km
   order by (starts_at at time zone 'America/Los_Angeles')::date asc,
-           going_count desc, starts_at asc, distance_km asc;
+           traffic_score desc nulls last, going_count desc, starts_at asc, distance_km asc;
 $$;
 
 -- ---------------------------------------------------------------------------
@@ -858,3 +866,7 @@ begin
   end if;
   return new;
 end $$;
+
+-- Traffic ranking (migrations/20261124000000_traffic_rank.sql)
+alter table afoot.events add column if not exists traffic_score smallint check (traffic_score between 1 and 100);
+alter table afoot.events add column if not exists traffic_scored_at timestamptz;

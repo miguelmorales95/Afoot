@@ -7,7 +7,7 @@
 // Needs RESEND_API_KEY, FOUNDER_EMAIL, ANTHROPIC_API_KEY and the Supabase variables.
 import "./env";
 import { supabase } from "../lib/supabase";
-import Anthropic from "@anthropic-ai/sdk";
+import { completeJson, jsonObject } from "../lib/llm";
 import { sendEmail } from "../lib/email";
 import { actionsSince, getSetting, rankCards, setSetting, venueStats, type VenueStat } from "../lib/founderQueue";
 
@@ -30,21 +30,8 @@ function laParts(d = new Date()) {
   return { weekday: p.weekday as string, hour: Number(p.hour), day: `${p.year}-${p.month}-${p.day}` };
 }
 const laDate = (iso: string) => new Date(iso).toLocaleString("en-US", { timeZone: "America/Los_Angeles", weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-// Structured outputs (output_config.format): the reply is guaranteed to match the schema, so a stray
-// quote can't break it. The installed SDK predates the field's types; it sends the body as given.
-async function structured<T>(o: { model: string; system: string; prompt: string; schema: Record<string, unknown>; maxTokens: number }): Promise<T> {
-  const params = {
-    model: o.model, max_tokens: o.maxTokens, system: o.system,
-    messages: [{ role: "user", content: o.prompt }],
-    output_config: { format: { type: "json_schema", schema: o.schema } },
-  } as unknown as Anthropic.MessageCreateParamsNonStreaming;
-  const msg = await new Anthropic().messages.create(params);
-  if (msg.stop_reason !== "end_turn") throw new Error(`no answer (stop: ${msg.stop_reason})`);
-  const text = msg.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("");
-  return JSON.parse(text) as T;
-}
+const structured = completeJson, obj = jsonObject;
 const str = { type: "string" }, ids = { type: "array", items: str };
-const obj = (properties: Record<string, unknown>) => ({ type: "object", properties, required: Object.keys(properties), additionalProperties: false });
 const PLAN_SCHEMA = obj({
   subject: str, opening: str, summary: str, planVenueIds: ids,
   todo: { type: "array", items: obj({ title: str, why: str, minutes: { type: "integer" } }) },

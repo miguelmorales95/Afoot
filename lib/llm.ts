@@ -82,6 +82,26 @@ export async function complete(o: CompleteOpts): Promise<string> {
   return provider === "ollama" ? completeOllama(o) : completeAnthropic(o);
 }
 
+/** A JSON Schema object whose properties are all required (what structured outputs expects). */
+export const jsonObject = (properties: Record<string, unknown>) =>
+  ({ type: "object", properties, required: Object.keys(properties), additionalProperties: false });
+
+/**
+ * Claude with structured outputs (output_config.format): the reply always matches `schema`.
+ * The installed SDK predates the field's types; it sends the body as given.
+ */
+export async function completeJson<T>(o: { model: string; system: string; prompt: string; schema: Record<string, unknown>; maxTokens: number }): Promise<T> {
+  const params = {
+    model: o.model, max_tokens: o.maxTokens, system: o.system,
+    messages: [{ role: "user", content: o.prompt }],
+    output_config: { format: { type: "json_schema", schema: o.schema } },
+  } as unknown as Anthropic.MessageCreateParamsNonStreaming;
+  const msg = await anthropicClient().messages.create(params);
+  if (msg.stop_reason !== "end_turn") throw new Error(`no answer (stop: ${msg.stop_reason})`);
+  const text = msg.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("");
+  return JSON.parse(text) as T;
+}
+
 /** Pull the first JSON object/array out of a model response. */
 export function extractJson(text: string): string {
   const t = text.trim();

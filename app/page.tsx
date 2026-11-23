@@ -48,6 +48,8 @@ const FILTERS: { key: string; label: string }[] = [
   { key: "market", label: "🛍️ Markets" },
 ];
 
+const PAGE = 25;
+
 export default function Home() {
   const [loc, setLoc] = useState<Loc | null>(null);
   const [events, setEvents] = useState<NearbyEvent[]>([]);
@@ -184,6 +186,15 @@ export default function Home() {
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [visible, featured]);
 
+  // Each day shows its top 25 by traffic; "View more" adds 25, and the third click shows all.
+  const [shown, setShown] = useState<Record<string, number>>({});
+  useEffect(() => setShown({}), [events, filter]);
+  const showDay = (key: string, n: number) => {
+    const shrinking = n < (shown[key] ?? PAGE);
+    setShown((s) => ({ ...s, [key]: n }));
+    if (shrinking) document.getElementById(`day-${key}`)?.scrollIntoView({ block: "start", behavior: "smooth" });
+  };
+
   return (
     <main className="mx-auto max-w-6xl px-4">
       {/* Hero / search */}
@@ -310,18 +321,47 @@ export default function Home() {
 
       {!loading &&
         view === "list" &&
-        grouped.map(([key, dayEvents], i) => (
-          <div key={key} className="mb-8">
-            <h2 className="sticky top-14 z-10 -mx-4 bg-[#0a0a0f]/90 px-4 py-2 text-sm font-semibold uppercase tracking-wider text-white/40 backdrop-blur">
-              {formatDayLabel(dayEvents[0].starts_at)}
-            </h2>
-            <div className="mt-2 space-y-3">
-              {dayEvents.map((ev) => (
-                <EventCard key={ev.occurrence_id} ev={ev} feedback={feedback} />
-              ))}
+        grouped.map(([key, dayEvents]) => {
+          const limit = shown[key] ?? PAGE;
+          const more = dayEvents.length - limit;
+          return (
+            <div key={key} id={`day-${key}`} className="mb-8 scroll-mt-14">
+              <div className="sticky top-14 z-10 -mx-4 flex items-center justify-between gap-3 bg-[#0a0a0f]/90 px-4 py-2 backdrop-blur">
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-white/40">
+                  {formatDayLabel(dayEvents[0].starts_at)}
+                  <span className="ml-2 normal-case tracking-normal text-white/25">{dayEvents.length} {dayEvents.length === 1 ? "event" : "events"}</span>
+                </h2>
+                {dayEvents.length > PAGE && (
+                  <div className="inline-flex shrink-0 rounded-full border border-white/10 bg-white/5 p-0.5 text-[11px] font-medium" aria-label="How many to show">
+                    {[["Top 25", PAGE], ["50", PAGE * 2], ["All", Infinity]].filter(([, n]) => n === Infinity || n === PAGE || (n as number) < dayEvents.length).map(([label, n]) => {
+                      const on = n === Infinity ? limit >= dayEvents.length : limit === n;
+                      return (
+                        <button key={label} onClick={() => showDay(key, n as number)}
+                          className={`rounded-full px-2.5 py-0.5 transition ${on ? "bg-white text-black" : "text-white/60 hover:text-white"}`}>
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              <div className="mt-2 space-y-3">
+                {dayEvents.slice(0, limit).map((ev) => (
+                  <EventCard key={ev.occurrence_id} ev={ev} feedback={feedback} />
+                ))}
+              </div>
+              {more > 0 && (
+                <button
+                  onClick={() => showDay(key, limit >= PAGE * 3 ? Infinity : limit + PAGE)}
+                  className="mt-3 w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-medium text-white/70 hover:bg-white/[0.06]"
+                >
+                  {limit >= PAGE * 3 ? `Show all ${dayEvents.length}` : `View ${Math.min(PAGE, more)} more`}
+                  <span className="text-white/40"> · {more} not shown</span>
+                </button>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
 
       {!loading && view === "list" && grouped.length > 0 && (
         <p className="-mt-4 mb-6 text-[11px] text-white/30">

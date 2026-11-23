@@ -43,6 +43,8 @@ export interface NearbyEvent {
   cancelled?: boolean;
   /** Tips from people who went, counted per device: { parking: 3, great_vibe: 5 }. */
   heads_up?: Partial<Record<HeadsUpReason, number>>;
+  /** Expected draw, 1–100, from the weekly ranking model; each day is ordered by it. */
+  traffic_score?: number | null;
 }
 
 export type UncertainField = "starts_at" | "date" | "address" | "price";
