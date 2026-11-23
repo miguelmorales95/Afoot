@@ -47,3 +47,24 @@ RETURNS TABLE (
   WHERE (er.event_id_1 = event_id OR er.event_id_2 = event_id)
   ORDER BY COALESCE(eo2.starts_at, eo1.starts_at) ASC
 $$ LANGUAGE SQL STABLE;
+
+-- RPC: Delete duplicate occurrences (same event + same start time, keep first)
+CREATE OR REPLACE FUNCTION afoot.dedupe_occurrences(target_event_id UUID)
+RETURNS int AS $$
+DECLARE
+  deleted_count int;
+BEGIN
+  WITH dupe_groups AS (
+    SELECT eo.starts_at,
+           ROW_NUMBER() OVER (PARTITION BY eo.starts_at ORDER BY eo.created_at) as rn,
+           eo.id
+    FROM afoot.event_occurrences eo
+    WHERE eo.event_id = target_event_id
+  )
+  DELETE FROM afoot.event_occurrences eo
+  WHERE eo.id IN (SELECT dg.id FROM dupe_groups dg WHERE dg.rn > 1);
+
+  GET DIAGNOSTICS deleted_count = ROW_COUNT;
+  RETURN deleted_count;
+END;
+$$ LANGUAGE plpgsql;

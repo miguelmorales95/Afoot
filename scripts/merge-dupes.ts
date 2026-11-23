@@ -92,6 +92,30 @@ async function mergeDuplicates() {
           // Move all occurrences from ev2 to ev1
           await supabase.from("event_occurrences").update({ event_id: ev1.id }).eq("event_id", ev2.id);
 
+          // Delete duplicate occurrences: keep first, delete rest with same starts_at
+          const { data: allOccs } = await supabase
+            .from("event_occurrences")
+            .select("id, starts_at")
+            .eq("event_id", ev1.id)
+            .order("created_at", { ascending: true });
+
+          if (allOccs && allOccs.length > 1) {
+            const seen = new Set<number>();
+            const toDel = [];
+            for (const occ of allOccs) {
+              const t = Date.parse(occ.starts_at);
+              if (seen.has(t)) {
+                toDel.push(occ.id);
+              } else {
+                seen.add(t);
+              }
+            }
+            if (toDel.length) {
+              await supabase.from("event_occurrences").delete().in("id", toDel);
+              if (verbose) console.log(`    ~ Deleted ${toDel.length} duplicate occurrence(s)`);
+            }
+          }
+
           // Delete ev2
           await supabase.from("events").delete().eq("id", ev2.id);
 

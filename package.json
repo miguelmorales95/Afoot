@@ -24,6 +24,7 @@
     "ticketmaster:venues": "tsx scripts/ticketmaster-venues.ts",
     "migrate": "tsx scripts/migrate.ts",
     "merge-dupes": "tsx scripts/merge-dupes.ts",
+    "dedupe-occurrences": "tsx scripts/dedupe-occurrences.ts",
     "screenshots": "tsx SC_2_Afoot/run.ts",
     "sources:import": "tsx scripts/import-sources.ts",
     "recurring": "tsx scripts/recurring.ts",
