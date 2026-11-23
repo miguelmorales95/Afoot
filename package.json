@@ -25,7 +25,8 @@
     "migrate": "tsx scripts/migrate.ts",
     "screenshots": "tsx SC_2_Afoot/run.ts",
     "sources:import": "tsx scripts/import-sources.ts",
-    "recurring": "tsx scripts/recurring.ts"
+    "recurring": "tsx scripts/recurring.ts",
+    "digest": "tsx scripts/digest.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.65.0",

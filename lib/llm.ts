@@ -22,6 +22,8 @@ export interface CompleteOpts {
   temperature?: number;
   /** Override the configured provider for a single call. */
   provider?: LLMProvider;
+  /** Claude model for this call (default EXTRACTION_MODEL or Haiku). */
+  model?: string;
 }
 
 export function defaultProvider(): LLMProvider {
@@ -35,7 +37,7 @@ function anthropicClient(): Anthropic {
 }
 
 async function completeAnthropic(o: CompleteOpts): Promise<string> {
-  const model = process.env.EXTRACTION_MODEL || "claude-haiku-5-5";
+  const model = o.model || process.env.EXTRACTION_MODEL || "claude-haiku-5-5";
   const msg = await anthropicClient().messages.create({
     model,
     max_tokens: o.maxTokens ?? 4000,

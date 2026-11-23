@@ -1,0 +1,40 @@
+# Founder emails: Monday plan, Thursday check-in, Saturday ideas, and on other days an email only
+# when a big event in the next week is missing details (scripts/digest.ts). Runs at 14:00 and 15:00 UTC
+# so one run lands at 7 a.m. in Los Angeles in both summer and winter; the script sends at most one
+# email of each kind per day. Repository secrets needed besides the ingest ones:
+#   RESEND_API_KEY (somedude.app sending key), FOUNDER_EMAIL (where the emails go)
+name: Founder emails
+
+on:
+  schedule:
+    - cron: "0 14,15 * * *"
+  workflow_dispatch:
+    inputs:
+      kind:
+        description: "monday | thursday | saturday | alert (empty: by today's day in LA)"
+        required: false
+        default: ""
+
+concurrency:
+  group: founder-digest
+  cancel-in-progress: false
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run digest -- ${KIND:+"$KIND"}
+        env:
+          KIND: ${{ inputs.kind }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          FOUNDER_EMAIL: ${{ secrets.FOUNDER_EMAIL }}

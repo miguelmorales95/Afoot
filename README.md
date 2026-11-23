@@ -159,6 +159,18 @@ A single screen to triage what to add. It merges community **submissions** and c
 ingest pulls its events); reject to dismiss. **Set `ADMIN_TOKEN` in production:** without it the
 admin routes refuse everyone on a deployed site (they're open only in local development).
 
+### Founder queue and emails (`/admin/queue`, `npm run digest`)
+
+A phone-first page with one card at a time. Most gaps are per venue, so each card is one venue
+missing an **address** (saved with a map pin) or a **price** (saved as `venues.default_price` and
+written to every event there with none; a database trigger keeps known prices through re-imports).
+**Venues** tracks in-person pitching (status, times contacted, notes). **AI prompt** is the ranking
+guidance the emails follow, stored in `founder_settings`. `.github/workflows/founder-digest.yml` runs
+`npm run digest` at 7 a.m. LA: Monday plan, Thursday check-in, Saturday ideas and where to pitch,
+and on other days an email only when a high-traffic event in the next week is missing details.
+Needs the repo secrets `RESEND_API_KEY` and `FOUNDER_EMAIL`. Preview without sending:
+`npm run digest -- monday --dry`.
+
 ### JS-rendered sites (Zebulon, etc.)
 
 Sites whose calendars load via JavaScript are handled by a headless-browser fallback (Playwright)
