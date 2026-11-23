@@ -5,6 +5,8 @@
  * Usage: npm run merge-dupes [--dry-run] [--verbose]
  */
 
+import "./env";
+
 import { supabase } from "../lib/supabase";
 
 const dryRun = process.argv.includes("--dry-run");
