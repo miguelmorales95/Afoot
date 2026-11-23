@@ -40,9 +40,9 @@ export default function SubmitPage() {
         <p className="mt-2 text-white/60">
           {kind === "event"
             ? readable
-              ? "We read the event from the link. Someone checks it, then it shows up on Afoot."
+              ? "We read the event from the link. Someone checks it, then it shows up on Light Pole."
               : "We couldn't read that page by ourselves, so we'll use the details you typed. Someone checks it before it shows up."
-            : "We'll review the venue and start pulling in its events. The more small spots people add, the better Afoot gets."}
+            : "We'll review the venue and start pulling in its events. The more small spots people add, the better Light Pole gets."}
         </p>
         <Link
           href="/"

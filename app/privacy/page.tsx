@@ -7,8 +7,8 @@ import Link from "next/link";
 // option loads Google's tracking scripts and would make the ads section below untrue.
 
 export const metadata: Metadata = {
-  title: "Privacy — Afoot",
-  description: "What Afoot collects, why, who can see it, and how to delete it.",
+  title: "Privacy — Light Pole",
+  description: "What Light Pole collects, why, who can see it, and how to delete it.",
 };
 
 const CONTACT = "hello@somedude.app";
@@ -40,7 +40,7 @@ export default function PrivacyPage() {
       <p className="mt-2 text-sm text-white/40">Effective {EFFECTIVE}</p>
 
       <p className="mt-6 text-white/80">
-        Afoot is made by SomeDude, an independent studio run by Miguel Morales. Afoot helps you
+        Light Pole is made by SomeDude, an independent studio run by Miguel Morales. Light Pole helps you
         find small local events. You can use it without an account. We collect as little as we
         can, and we explain all of it here.
       </p>
@@ -72,13 +72,13 @@ export default function PrivacyPage() {
           </li>
           <li>
             <strong className="text-white/90">Remembering your spot.</strong> Your browser keeps your
-            last location on your own device, so Afoot opens where you left off. Clearing this
+            last location on your own device, so Light Pole opens where you left off. Clearing this
             site&apos;s data in your browser removes it.
           </li>
           <li>
             <strong className="text-white/90">Visit counts.</strong> We use Vercel Web Analytics to
             count page visits: which pages, how many visits a day, and general details like country
-            and device type. It doesn&apos;t use cookies. We use the totals to improve Afoot and to
+            and device type. It doesn&apos;t use cookies. We use the totals to improve Light Pole and to
             tell sponsors roughly how many people visit.
           </li>
           <li>
@@ -114,7 +114,7 @@ export default function PrivacyPage() {
             Totals like &ldquo;Hard to park · 3&rdquo; are public. Who sent them is not.
           </li>
           <li>
-            Notes are read by the Afoot admin. When we double-check a listing, your note may be
+            Notes are read by the Light Pole admin. When we double-check a listing, your note may be
             shown to an AI model along with the event&apos;s web page. Please don&apos;t put personal
             details in notes.
           </li>
@@ -173,7 +173,7 @@ export default function PrivacyPage() {
       <Section id="sponsors" title="Sponsors and ads">
         <List>
           <li>
-            Ads on Afoot are cards from local sponsors we sell ourselves, plus our own promos. We
+            Ads on Light Pole are cards from local sponsors we sell ourselves, plus our own promos. We
             don&apos;t run outside ad networks. If that ever changes, we&apos;ll update this page
             before it happens.
           </li>
@@ -188,7 +188,7 @@ export default function PrivacyPage() {
           </li>
           <li>
             When you tap a sponsor card, you go to the sponsor&apos;s site with a tag saying the
-            visit came from Afoot and which area. Their privacy policy applies there.
+            visit came from Light Pole and which area. Their privacy policy applies there.
           </li>
         </List>
       </Section>
@@ -216,8 +216,8 @@ export default function PrivacyPage() {
             number, if you allowed sharing.
           </li>
           <li>
-            <strong className="text-white/90">The Afoot admin (Miguel):</strong> venue suggestions,
-            feedback and notes, reports, and account data when needed to run Afoot, keep it safe, or
+            <strong className="text-white/90">The Light Pole admin (Miguel):</strong> venue suggestions,
+            feedback and notes, reports, and account data when needed to run Light Pole, keep it safe, or
             answer your request.
           </li>
           <li>
@@ -303,7 +303,7 @@ export default function PrivacyPage() {
 
       <Section id="children" title="Children">
         <p>
-          Afoot isn&apos;t meant for children under 13, and we don&apos;t knowingly collect their
+          Light Pole isn&apos;t meant for children under 13, and we don&apos;t knowingly collect their
           information. If you think a child has given us information, email <Mail /> and we&apos;ll
           delete it. Many events listed are for adults (21+).
         </p>

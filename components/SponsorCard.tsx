@@ -23,7 +23,7 @@ export default function SponsorCard({
     <>
       <h3 className="text-sm font-semibold text-white">{campaign.title}</h3>
       {campaign.body && <p className="mt-1 text-xs text-white/50">{campaign.body}</p>}
-      <span className="mt-3 block text-xs font-medium text-fuchsia-400">{campaign.cta || "Learn more →"}</span>
+      <span className="mt-3 block text-xs font-medium text-[#ffe45c]">{campaign.cta || "Learn more →"}</span>
     </>
   );
 

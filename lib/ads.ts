@@ -59,7 +59,7 @@ export interface LiveCampaign {
 }
 
 export const WHY_SPONSORED =
-  "Afoot shows the same sponsor to everyone browsing this area. We don't track you.";
+  "Light Pole shows the same sponsor to everyone browsing this area. We don't track you.";
 
 /** "Hermosa & Redondo" -> "hermosa-redondo"; used in UTM tags and report file names. */
 export function areaSlug(area: string): string {
@@ -97,7 +97,7 @@ export function campaignsFor(list: LiveCampaign[], product: CampaignProduct, are
 }
 
 // Google AdSense defaults to non-personalized ads (no profile-based targeting) to stay
-// close to Afoot's privacy promise. Set NEXT_PUBLIC_ADSENSE_PERSONALIZED=1 to allow
+// close to Light Pole's privacy promise. Set NEXT_PUBLIC_ADSENSE_PERSONALIZED=1 to allow
 // personalized ads (higher pay; needs a consent banner and a "Do Not Sell or Share" link).
 export const ADSENSE_PERSONALIZED = process.env.NEXT_PUBLIC_ADSENSE_PERSONALIZED === "1";
 
@@ -109,7 +109,7 @@ export function trackingFree(): boolean {
 
 // House promos: the last fallback for any slot. The first one sells the space itself.
 export function advertiseMailto(): string {
-  const subject = encodeURIComponent("Advertise on Afoot");
+  const subject = encodeURIComponent("Advertise on Light Pole");
   return `mailto:${SUGGEST_EMAIL}?subject=${subject}`;
 }
 

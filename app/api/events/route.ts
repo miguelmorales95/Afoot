@@ -27,18 +27,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ events: demoNearby(lat, lng, radius), demo: true });
   }
 
-  const { data, error } = await supabase.rpc("nearby_events", {
-    in_lat: lat,
-    in_lng: lng,
-    in_radius_km: radius,
-    in_days_ahead: days,
-  });
-
-  if (error) {
-    console.error("nearby_events error:", error.message);
-    return NextResponse.json({ error: "query failed" }, { status: 500 });
+  // The database returns at most 1,000 rows per request, so read in pages (busy areas have more).
+  const PAGE = 1000, MAX_ROWS = 8000;
+  const data: unknown[] = [];
+  for (let from = 0; from < MAX_ROWS; from += PAGE) {
+    const { data: page, error } = await supabase
+      .rpc("nearby_events", { in_lat: lat, in_lng: lng, in_radius_km: radius, in_days_ahead: days })
+      .range(from, from + PAGE - 1);
+    if (error) {
+      console.error("nearby_events error:", error.message);
+      return NextResponse.json({ error: "query failed" }, { status: 500 });
+    }
+    data.push(...(page ?? []));
+    if (!page || page.length < PAGE) break;
   }
 
   // `feedback`: events come from the database, so flags and checks can be saved.
-  return NextResponse.json({ events: data ?? [], feedback: true });
+  return NextResponse.json({ events: data, feedback: true });
 }

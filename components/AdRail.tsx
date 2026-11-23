@@ -11,7 +11,7 @@ export default function AdRail({ area = null }: { area?: string | null }) {
         <AdUnit index={0} area={area} className="min-h-[200px]" slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_RAIL} />
         <AdUnit index={1} area={area} className="min-h-[200px]" />
         <p className="px-1 text-[10px] leading-relaxed text-white/20">
-          {trackingFree() ? "Ads keep Afoot free. No cookies, no tracking." : "Ads keep Afoot free. Local sponsors first; no personalized ads."}
+          {trackingFree() ? "Ads keep Light Pole free. No cookies, no tracking." : "Ads keep Light Pole free. Local sponsors first; no personalized ads."}
         </p>
       </div>
     </aside>

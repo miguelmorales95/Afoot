@@ -8,6 +8,7 @@ import {
   dayKey,
   formatDayLabel,
   formatDistance,
+  formatShortDate,
   formatTime,
 } from "@/lib/format";
 import AdRail from "@/components/AdRail";
@@ -179,11 +180,13 @@ export default function Home() {
     const map = new Map<string, NearbyEvent[]>();
     for (const ev of visible) {
       if (pinned.has(ev.occurrence_id)) continue;
-      const k = dayKey(ev.starts_at);
+      // A run that started before today (a play through Nov 29) belongs under today, not its first night.
+      const k = dayKey(startedBefore(ev) ? new Date().toISOString() : ev.starts_at);
       const bucket = map.get(k);
       if (bucket) bucket.push(ev);
       else map.set(k, [ev]);
     }
+    for (const bucket of map.values()) bucket.sort((x, y) => (y.traffic_score ?? 0) - (x.traffic_score ?? 0));
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [visible, featured]);
 
@@ -202,11 +205,11 @@ export default function Home() {
       <section className="hero-glow -mx-4 px-4 pt-10 pb-8">
         <div className="mx-auto max-w-2xl text-center">
           <h1 className="text-balance text-3xl font-bold tracking-tight sm:text-4xl">
-            The small stuff happening near you.
+            What&apos;s posted around LA.
           </h1>
           <p className="mx-auto mt-3 max-w-xl text-pretty text-white/60">
-            Karaoke, board game nights, open mics, neighborhood shows — the local events that
-            never make it onto the big ticketing sites. No login, just your corner of LA.
+            Shows, markets, game nights, open mics and the small stuff that never makes the big
+            ticketing sites, all on one pole. No login, just your corner of LA.
           </p>
 
           <form onSubmit={search} className="mx-auto mt-6 flex max-w-lg flex-col gap-2 sm:flex-row">
@@ -214,11 +217,11 @@ export default function Home() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Neighborhood, city, or ZIP (e.g. Echo Park)"
-              className="flex-1 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm outline-none placeholder:text-white/30 focus:border-fuchsia-500/50"
+              className="flex-1 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm outline-none placeholder:text-white/30 focus:border-[#ffe45c]/60"
             />
             <button
               type="submit"
-              className="rounded-full bg-fuchsia-600 px-5 py-3 text-sm font-semibold text-white hover:bg-fuchsia-500"
+              className="rounded-full bg-[#ffe45c] px-5 py-3 text-sm font-semibold text-[#1a1a1a] hover:bg-[#fff08a]"
             >
               Find events
             </button>
@@ -236,7 +239,7 @@ export default function Home() {
                 type="button"
                 onClick={() => pickArea(a)}
                 className={`rounded-full px-3 py-1 text-xs transition ${
-                  loc?.label === a.name ? "bg-fuchsia-600 text-white" : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
+                  loc?.label === a.name ? "bg-[#ffe45c] text-[#1a1a1a]" : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 {a.name}
@@ -327,9 +330,9 @@ export default function Home() {
           const more = dayEvents.length - limit;
           return (
             <div key={key} id={`day-${key}`} className="mb-8 scroll-mt-14">
-              <div className="sticky top-14 z-10 -mx-4 flex items-center justify-between gap-3 bg-[#0a0a0f]/90 px-4 py-2 backdrop-blur">
+              <div className="sticky top-14 z-10 -mx-4 flex items-center justify-between gap-3 bg-[#2b2119]/90 px-4 py-2 backdrop-blur">
                 <h2 className="text-sm font-semibold uppercase tracking-wider text-white/40">
-                  {formatDayLabel(dayEvents[0].starts_at)}
+                  {formatDayLabel(startedBefore(dayEvents[0]) ? new Date().toISOString() : dayEvents[0].starts_at)}
                   <span className="ml-2 normal-case tracking-normal text-white/25">{dayEvents.length} {dayEvents.length === 1 ? "event" : "events"}</span>
                 </h2>
                 {dayEvents.length > PAGE && (
@@ -391,6 +394,19 @@ export default function Home() {
   );
 }
 
+/** Started on an earlier day and still running (shown under today, with its end date). */
+function startedBefore(ev: NearbyEvent) {
+  return dayKey(ev.starts_at) < dayKey(new Date().toISOString());
+}
+
+// Street-flyer paper colors; each event keeps the same color and tilt on every visit.
+const PAPER = ["#ffe45c", "#ff9ec0", "#8ed8f8", "#b9ef9b", "#ffbf73", "#fffdf7"];
+function flyerLook(id: string): React.CSSProperties {
+  let h = 0;
+  for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return { "--paper": PAPER[h % PAPER.length], "--tilt": `${((h >> 3) % 5 - 2) * 0.35}deg` } as React.CSSProperties;
+}
+
 function EventCard({ ev, feedback, featured }: { ev: NearbyEvent; feedback: boolean; featured?: LiveCampaign }) {
   const cat = categoryMeta(ev.category);
   const seenRef = useSeen(featured?.id ?? null);
@@ -399,24 +415,25 @@ function EventCard({ ev, feedback, featured }: { ev: NearbyEvent; feedback: bool
   useEffect(() => (cardEl ? observeEventView(cardEl, ev.event_id) : undefined), [cardEl, ev.event_id]);
   const cardRef = useCallback((el: HTMLDivElement | null) => { setCardEl(el); if (featured) seenRef(el); }, [featured, seenRef]);
   const onTap = () => countClick(ev.event_id);
+  const look = flyerLook(ev.event_id);
   const body = (
-    <div ref={cardRef} className="group flex gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 transition hover:border-white/20 hover:bg-white/[0.05] sm:gap-4">
+    <div ref={cardRef} className="flyer flex gap-3 p-4 pt-6 sm:gap-4" style={look}>
       <div className="flex w-24 shrink-0 flex-col gap-1.5 sm:w-32">
         <time
           dateTime={ev.starts_at}
-          className="rounded-lg bg-white/5 py-1 text-center text-sm font-semibold text-white/90"
+          className="rounded-md bg-black/[0.08] py-1 text-center text-sm font-bold text-[#1a1a1a]"
         >
-          {formatTime(ev.starts_at)}
+          {startedBefore(ev) && ev.ends_at ? `Until ${formatShortDate(ev.ends_at)}` : formatTime(ev.starts_at)}
         </time>
         <VenueMiniMap lat={ev.venue_lat} lng={ev.venue_lng} venue={ev.venue_name} />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-3">
-          <h3 className={`font-semibold leading-snug text-white group-hover:text-fuchsia-300 ${ev.cancelled ? "line-through opacity-60" : ""}`}>
+          <h3 className={`text-[17px] font-extrabold leading-snug text-[#1a1a1a] ${ev.cancelled ? "line-through opacity-60" : ""}`}>
             {ev.title}
           </h3>
           <span
-            className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ${cat.className}`}
+            className="shrink-0 rounded-full border border-black/20 bg-white/60 px-2 py-0.5 text-[11px] font-semibold text-[#1a1a1a]"
           >
             {cat.emoji} {cat.label}
           </span>
@@ -427,17 +444,17 @@ function EventCard({ ev, feedback, featured }: { ev: NearbyEvent; feedback: bool
               Featured
             </span>
             {/* Pinned above the day list, so say which day. */}
-            <span className="text-[11px] text-white/50">{formatDayLabel(ev.starts_at)}</span>
-            <span className="text-[10px] uppercase tracking-widest text-white/40">Sponsored</span>
+            <span className="text-[11px] text-black/60">{formatDayLabel(ev.starts_at)}</span>
+            <span className="text-[10px] uppercase tracking-widest text-black/55">Sponsored</span>
             <WhySponsored className="" />
           </div>
         )}
-        <p className="mt-0.5 text-sm text-white/55">
+        <p className="mt-0.5 text-sm font-medium text-black/70">
           {ev.venue_name} · {formatDistance(ev.distance_km)} away
           {ev.price ? ` · ${ev.price_is_usual ? "usually " : ""}${ev.price}` : ""}
         </p>
         {(ev.venue_parking || ev.venue_good_to_know) && (
-          <p className="mt-0.5 text-xs text-white/40">
+          <p className="mt-0.5 text-xs text-black/60">
             {ev.venue_parking ? `🅿️ ${ev.venue_parking}` : ""}
             {ev.venue_parking && ev.venue_good_to_know ? " · " : ""}
             {ev.venue_good_to_know ? `ℹ️ ${ev.venue_good_to_know}` : ""}
@@ -447,19 +464,19 @@ function EventCard({ ev, feedback, featured }: { ev: NearbyEvent; feedback: bool
           <div className="mt-1.5 flex flex-wrap gap-1"><UnconfirmedBadges ev={ev} /></div>
         )}
         {ev.description && (
-          <p className="mt-1 line-clamp-2 text-sm text-white/40">{ev.description}</p>
+          <p className="mt-1 line-clamp-2 text-sm text-black/65">{ev.description}</p>
         )}
         {ev.tags && ev.tags.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
             {ev.tags.slice(0, 4).map((t) => (
-              <span key={t} className="rounded-full bg-white/5 px-2 py-0.5 text-[11px] text-white/50">
+              <span key={t} className="rounded-full bg-black/[0.08] px-2 py-0.5 text-[11px] text-black/70">
                 {t}
               </span>
             ))}
           </div>
         )}
         {ev.is_recurring && ev.recurrence_description && (
-          <p className="mt-1 text-xs text-white/30">🔁 {ev.recurrence_description}</p>
+          <p className="mt-1 text-xs text-black/55">🔁 {ev.recurrence_description}</p>
         )}
         <GoingButton ev={ev} />
         <EventFeedback ev={ev} enabled={feedback} />

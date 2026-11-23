@@ -122,7 +122,7 @@ export default function AdUnit({
   return <HouseCard ad={HOUSE_ADS[index % HOUSE_ADS.length]} className={className} />;
 }
 
-function HouseCard({ ad, className = "", label = "From Afoot" }: { ad: HouseAd; className?: string; label?: string }) {
+function HouseCard({ ad, className = "", label = "From Light Pole" }: { ad: HouseAd; className?: string; label?: string }) {
   const inner = (
     <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.03] p-4">
       <div className="mb-2 flex items-center justify-between">
@@ -131,12 +131,12 @@ function HouseCard({ ad, className = "", label = "From Afoot" }: { ad: HouseAd; 
       </div>
       <h3 className="text-sm font-semibold text-white">{ad.title}</h3>
       <p className="mt-1 flex-1 text-xs text-white/50">{ad.body}</p>
-      <span className="mt-3 text-xs font-medium text-fuchsia-400">{ad.cta}</span>
+      <span className="mt-3 text-xs font-medium text-[#ffe45c]">{ad.cta}</span>
     </div>
   );
 
   return (
-    <div className={className} aria-label="Message from Afoot" role="complementary">
+    <div className={className} aria-label="Message from Light Pole" role="complementary">
       {ad.href.startsWith("/") ? (
         <Link href={ad.href} className="block h-full">
           {inner}

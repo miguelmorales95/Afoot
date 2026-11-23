@@ -5,7 +5,7 @@ export const SUGGEST_EMAIL =
 
 /** A prefilled mailto: link for suggesting a venue/site. */
 export function suggestMailto(): string {
-  const subject = encodeURIComponent("New venue for Afoot");
+  const subject = encodeURIComponent("New venue for Light Pole");
   const body = encodeURIComponent(
     [
       "Venue name:",

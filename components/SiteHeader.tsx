@@ -7,12 +7,12 @@ import { suggestMailto } from "@/lib/site";
 
 export default function SiteHeader() {
   return (
-    <header className="sticky top-0 z-30 border-b border-white/10 bg-[#0a0a0f]/80 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-white/10 bg-[#2b2119]/90 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
         <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
-          <span className="text-xl">📍</span>
+          <span className="text-xl">📌</span>
           <span>
-            Afoot<span className="text-fuchsia-400"> LA</span>
+            Light Pole
           </span>
         </Link>
         <nav className="flex items-center gap-2 text-sm text-white/70">
@@ -48,7 +48,7 @@ function AuthButton() {
           onClick={() => setOpen((o) => !o)}
           className="flex items-center gap-2 rounded-full bg-white/10 py-1 pl-1 pr-3 text-sm font-medium text-white hover:bg-white/20"
         >
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-fuchsia-600 text-xs">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#ff8fb1] text-xs text-[#1a1a1a]">
             {user.name.charAt(0).toUpperCase()}
           </span>
           <span className="max-w-[90px] truncate">{user.name}</span>
@@ -56,7 +56,7 @@ function AuthButton() {
         {open && (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-            <div className="absolute right-0 z-50 mt-2 w-44 overflow-hidden rounded-xl border border-white/10 bg-[#14141b] py-1 shadow-xl">
+            <div className="absolute right-0 z-50 mt-2 w-44 overflow-hidden rounded-xl border border-white/10 bg-[#3a2d23] py-1 shadow-xl">
               <MenuLink href="/inbox" onClick={() => setOpen(false)}>📥 Inbox</MenuLink>
               <MenuLink href="/profile" onClick={() => setOpen(false)}>⚙️ Profile</MenuLink>
               <button
@@ -79,14 +79,14 @@ function AuthButton() {
     <div className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="rounded-full bg-fuchsia-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-fuchsia-500"
+        className="rounded-full bg-[#ffe45c] px-4 py-1.5 text-sm font-semibold text-[#1a1a1a] hover:bg-[#fff08a]"
       >
         Sign in
       </button>
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-50 mt-2 w-56 rounded-xl border border-white/10 bg-[#14141b] p-2 shadow-xl">
+          <div className="absolute right-0 z-50 mt-2 w-56 rounded-xl border border-white/10 bg-[#3a2d23] p-2 shadow-xl">
             <button
               onClick={() => {
                 setOpen(false);

@@ -7,18 +7,18 @@ import SiteHeader from "@/components/SiteHeader";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Afoot — small events near you",
+  title: "Light Pole — what's posted around LA",
   description:
-    "Karaoke, game nights, live music and the small local events that never make it onto Eventbrite. Sourced from LA venue calendars and newsletters.",
+    "Everything posted around LA, from big nights out to karaoke, game nights and open mics. Gathered from venue calendars and newsletters.",
   openGraph: {
-    title: "Afoot",
-    description: "The small local events near you that are hard to find anywhere else.",
+    title: "Light Pole",
+    description: "What's posted around LA: the big nights and the small stuff, all on one pole.",
     type: "website",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0a0a0f",
+  themeColor: "#2b2119",
   width: "device-width",
   initialScale: 1,
 };
@@ -36,13 +36,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Analytics />
         <footer className="mx-auto max-w-6xl px-4 py-10 text-sm text-white/40">
           <p>
-            Afoot surfaces the small stuff — karaoke, game nights, local shows — from venue
-            calendars and newsletters. Know a spot we&apos;re missing?{" "}
-            <Link href="/submit" className="text-fuchsia-400 hover:underline">
+            Light Pole is where LA posts what&apos;s happening: the big nights and the small stuff,
+            gathered from venue calendars and newsletters. Know a spot we&apos;re missing?{" "}
+            <Link href="/submit" className="text-[#ffe45c] hover:underline">
               Add it
             </Link>{" "}
             or{" "}
-            <a href={suggestMailto()} className="text-fuchsia-400 hover:underline">
+            <a href={suggestMailto()} className="text-[#ffe45c] hover:underline">
               email it to us
             </a>
             .

@@ -1,8 +1,10 @@
 @import "tailwindcss";
 
+/* Light Pole: street flyers stapled to a dark wooden pole. */
 :root {
-  --background: #0a0a0f;
-  --foreground: #ededf2;
+  --background: #2b2119;
+  --foreground: #f3ece2;
+  --ink: #1a1a1a;
 }
 
 html {
@@ -16,12 +18,54 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Subtle radial glow behind the hero. */
+/* Warm streetlight glow behind the hero. */
 .hero-glow {
   background:
-    radial-gradient(60% 50% at 50% 0%, rgba(168, 85, 247, 0.18), transparent 70%),
-    radial-gradient(40% 40% at 80% 10%, rgba(236, 72, 153, 0.12), transparent 70%);
+    radial-gradient(60% 50% at 50% 0%, rgba(255, 228, 92, 0.16), transparent 70%),
+    radial-gradient(40% 40% at 80% 10%, rgba(255, 143, 177, 0.10), transparent 70%);
 }
+
+/* Event cards are paper flyers: one bright color each (--paper), a slight tilt (--tilt), and
+   two staples. Unlayered, so these beat Tailwind utilities on purpose. */
+.flyer {
+  position: relative;
+  background: var(--paper, #ffe45c);
+  color: var(--ink);
+  border-radius: 4px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.38), 0 1px 0 rgba(0, 0, 0, 0.25);
+  transform: rotate(var(--tilt, 0deg));
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+a:hover > .flyer, .flyer:hover { transform: rotate(0deg) translateY(-2px); box-shadow: 0 12px 26px rgba(0, 0, 0, 0.45); }
+.flyer::before, .flyer::after {
+  content: "";
+  position: absolute;
+  top: 9px;
+  width: 18px;
+  height: 4px;
+  border-radius: 1px;
+  background: linear-gradient(#eef0f2, #aeb3b8);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
+}
+.flyer::before { left: 18px; transform: rotate(-4deg); }
+.flyer::after { right: 18px; transform: rotate(3deg); }
+/* Shared parts inside a card (going button, badges, report menu) were drawn for a dark page:
+   re-ink them for paper. */
+.flyer [class*="text-white"] { color: rgb(26 26 26 / 0.8); }
+.flyer [class*="bg-white/"] { background-color: rgb(0 0 0 / 0.08); }
+.flyer [class*="bg-white/"]:hover { background-color: rgb(0 0 0 / 0.15); }
+.flyer [class*="border-white/"] { border-color: rgb(0 0 0 / 0.15); }
+.flyer [class*="ring-"] { --tw-ring-color: rgb(0 0 0 / 0.2); }
+.flyer [class*="text-amber-"] { color: #6b4200; }
+.flyer [class*="bg-amber-"] { background-color: rgb(107 66 0 / 0.12); }
+.flyer [class*="text-red-"] { color: #8f1d1d; }
+.flyer [class*="bg-red-"] { background-color: rgb(143 29 29 / 0.1); }
+.flyer [class*="text-emerald-"] { color: #14532d; }
+.flyer [class*="bg-emerald-"] { background-color: rgb(20 83 45 / 0.15); }
+.flyer [class*="text-fuchsia-"] { color: #9d174d; }
+.flyer [class*="bg-fuchsia-"] { background-color: rgb(157 23 77 / 0.12); }
+.flyer [class*="bg-[#14141c]"] { background-color: #fffdf7; }
+.flyer input::placeholder, .flyer textarea::placeholder { color: rgb(26 26 26 / 0.45); }
 
 /* Ad slots: show the house promo until AdSense fills the slot, and again if it can't. */
 .ad-slot .ad-fallback { display: block; }
