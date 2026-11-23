@@ -8,6 +8,16 @@ const nextConfig = {
   outputFileTracingIncludes: {
     "/api/events": ["./data/**/*.csv"],
   },
+  // Browsers never keep pages or API data, so every visit gets the latest deploy.
+  // /_next/static files are left alone: their names change on every deploy anyway.
+  async headers() {
+    return [
+      {
+        source: "/((?!_next/static|_next/image).*)",
+        headers: [{ key: "Cache-Control", value: "no-store, max-age=0" }],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
