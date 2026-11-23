@@ -174,6 +174,16 @@ and on other days an email only when a high-traffic event in the next week is mi
 Needs the repo secrets `RESEND_API_KEY` and `FOUNDER_EMAIL`. Preview without sending:
 `npm run digest -- monday --dry`.
 
+### Traffic ranking (`npm run rank`, nightly, no AI)
+
+Each day on the site shows its top 25 events by `events.traffic_score` (View more adds 25; the
+third click shows all). The score is plain arithmetic in `lib/rank.ts`: the venue's draw (from its
+Wikipedia page views, refreshed weekly; schools and libraries capped at 40; `draw_source =
+'manual'` is never overwritten), category, one-off vs. weekly, weekend dates, free, title keywords,
+and taps. Taps and card views are counted per event per day in `event_daily` (counts only, sent in
+batches with sendBeacon to `/api/events/seen`); a jump in taps week over week adds a "taking off"
+bonus. Preview without saving: `npm run rank -- --dry`.
+
 ### JS-rendered sites (Zebulon, etc.)
 
 Sites whose calendars load via JavaScript are handled by a headless-browser fallback (Playwright)

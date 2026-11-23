@@ -19,6 +19,7 @@ import VenueMiniMap from "@/components/VenueMiniMap";
 import { LAUNCH_AREAS, type LaunchArea } from "@/lib/areas";
 import { areaForLocation, campaignsFor, type LiveCampaign } from "@/lib/ads";
 import { useLiveCampaigns, useSeen } from "@/lib/sponsorClient";
+import { countClick, observeEventView } from "@/lib/eventStatsClient";
 import { WhySponsored } from "@/components/SponsorCard";
 
 const EventsMap = dynamic(() => import("@/components/EventsMap"), {
@@ -393,8 +394,13 @@ export default function Home() {
 function EventCard({ ev, feedback, featured }: { ev: NearbyEvent; feedback: boolean; featured?: LiveCampaign }) {
   const cat = categoryMeta(ev.category);
   const seenRef = useSeen(featured?.id ?? null);
+  // Views and taps feed the traffic ranking (counts only).
+  const [cardEl, setCardEl] = useState<HTMLDivElement | null>(null);
+  useEffect(() => (cardEl ? observeEventView(cardEl, ev.event_id) : undefined), [cardEl, ev.event_id]);
+  const cardRef = useCallback((el: HTMLDivElement | null) => { setCardEl(el); if (featured) seenRef(el); }, [featured, seenRef]);
+  const onTap = () => countClick(ev.event_id);
   const body = (
-    <div ref={featured ? seenRef : undefined} className="group flex gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 transition hover:border-white/20 hover:bg-white/[0.05] sm:gap-4">
+    <div ref={cardRef} className="group flex gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 transition hover:border-white/20 hover:bg-white/[0.05] sm:gap-4">
       <div className="flex w-24 shrink-0 flex-col gap-1.5 sm:w-32">
         <time
           dateTime={ev.starts_at}
@@ -464,14 +470,14 @@ function EventCard({ ev, feedback, featured }: { ev: NearbyEvent; feedback: bool
   // A featured event links through /go/<campaign> (counts a click, then the campaign's link).
   if (featured) {
     return (
-      <a href={`/go/${featured.id}`} target="_blank" rel="sponsored noopener" className="block">
+      <a href={`/go/${featured.id}`} target="_blank" rel="sponsored noopener" className="block" onClick={onTap}>
         {body}
       </a>
     );
   }
 
   return ev.url ? (
-    <a href={ev.url} target="_blank" rel="noopener noreferrer" className="block">
+    <a href={ev.url} target="_blank" rel="noopener noreferrer" className="block" onClick={onTap}>
       {body}
     </a>
   ) : (
