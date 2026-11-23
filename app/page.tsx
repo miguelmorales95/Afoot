@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import type { NearbyEvent } from "@/lib/types";
 import {
@@ -13,7 +13,6 @@ import {
 } from "@/lib/format";
 import AdRail from "@/components/AdRail";
 import AdUnit from "@/components/AdUnit";
-import EventsTable from "@/components/EventsTable";
 import GoingButton from "@/components/GoingButton";
 import EventFeedback, { UnconfirmedBadges } from "@/components/EventFeedback";
 import VenueMiniMap from "@/components/VenueMiniMap";
@@ -30,7 +29,7 @@ const EventsMap = dynamic(() => import("@/components/EventsMap"), {
   ),
 });
 
-type View = "list" | "table" | "map";
+type View = "list" | "map";
 
 interface Loc {
   lat: number;
@@ -61,6 +60,17 @@ export default function Home() {
   const [view, setView] = useState<View>("list");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [heroOpen, setHeroOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [mapDay, setMapDay] = useState<string | null>(null);
+  const controlsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!sheetOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setSheetOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sheetOpen]);
 
   // Restore last location on mount.
   useEffect(() => {
@@ -79,6 +89,9 @@ export default function Home() {
 
   const persist = (l: Loc) => {
     setLoc(l);
+    setHeroOpen(false);
+    setSheetOpen(false);
+    window.scrollTo({ top: 0 });
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(l));
     } catch {
@@ -181,7 +194,7 @@ export default function Home() {
     for (const ev of visible) {
       if (pinned.has(ev.occurrence_id)) continue;
       // A run that started before today (a play through Nov 29) belongs under today, not its first night.
-      const k = dayKey(startedBefore(ev) ? new Date().toISOString() : ev.starts_at);
+      const k = eventDay(ev);
       const bucket = map.get(k);
       if (bucket) bucket.push(ev);
       else map.set(k, [ev]);
@@ -199,96 +212,145 @@ export default function Home() {
     if (shrinking) document.getElementById(`day-${key}`)?.scrollIntoView({ block: "start", behavior: "smooth" });
   };
 
+  const scrollToControls = () =>
+    requestAnimationFrame(() => controlsRef.current?.scrollIntoView({ block: "start" }));
+
+  const openMap = (day?: string) => {
+    setMapDay(day ?? todayKey());
+    setView("map");
+    scrollToControls();
+  };
+
+  const pickFilter = (key: string, fromSheet = false) => {
+    setFilter(key);
+    if (fromSheet) {
+      setSheetOpen(false);
+      scrollToControls();
+    }
+  };
+
+  const shownDay = mapDay ?? todayKey();
+  const lastDay = grouped.length ? grouped[grouped.length - 1][0] : todayKey();
+  const mapEvents = useMemo(() => visible.filter((e) => eventDay(e) === shownDay), [visible, shownDay]);
+
+  const searchForm = (
+    <form onSubmit={search} className="relative mx-auto w-full max-w-lg">
+      <input
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Neighborhood, city, or ZIP"
+        aria-label="Neighborhood, city, or ZIP"
+        className="w-full rounded-full border border-white/10 bg-white/5 py-3 pl-5 pr-24 text-sm outline-none placeholder:text-white/30 focus:border-[#ffe45c]/60"
+      />
+      <button
+        type="submit"
+        className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full bg-[#ffe45c] px-4 py-2 text-sm font-semibold text-[#1a1a1a] hover:bg-[#fff08a]"
+      >
+        Search
+      </button>
+    </form>
+  );
+
+  const areaChips = (
+    <div className="flex flex-wrap justify-center gap-1.5" aria-label="Neighborhoods">
+      {LAUNCH_AREAS.map((a) => (
+        <button
+          key={a.name}
+          type="button"
+          onClick={() => pickArea(a)}
+          className={`rounded-full px-3 py-1 text-xs transition ${
+            loc?.label === a.name ? "bg-[#ffe45c] text-[#1a1a1a]" : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
+          }`}
+        >
+          {a.name}
+        </button>
+      ))}
+    </div>
+  );
+
+  const typeChips = (fromSheet: boolean) => (
+    <div className={`flex flex-wrap gap-1.5 ${fromSheet ? "justify-center" : ""}`} aria-label="Event types">
+      {FILTERS.map((f) => (
+        <button
+          key={f.key}
+          onClick={() => pickFilter(f.key, fromSheet)}
+          className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+            filter === f.key ? "bg-white text-black" : "bg-white/5 text-white/60 hover:bg-white/10"
+          }`}
+        >
+          {f.label}
+        </button>
+      ))}
+    </div>
+  );
+
   return (
     <main className="mx-auto max-w-6xl px-4">
-      {/* Hero / search */}
-      <section className="hero-glow -mx-4 px-4 pt-10 pb-8">
-        <div className="mx-auto max-w-2xl text-center">
-          <h1 className="text-balance text-3xl font-bold tracking-tight sm:text-4xl">
-            What&apos;s posted around LA.
-          </h1>
-          <p className="mx-auto mt-3 max-w-xl text-pretty text-white/60">
-            Shows, markets, game nights, open mics and the small stuff that never makes the big
-            ticketing sites, all on one pole. No login, just your corner of LA.
-          </p>
-
-          <form onSubmit={search} className="mx-auto mt-6 flex max-w-lg flex-col gap-2 sm:flex-row">
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Neighborhood, city, or ZIP (e.g. Echo Park)"
-              className="flex-1 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm outline-none placeholder:text-white/30 focus:border-[#ffe45c]/60"
-            />
+      {/* Top: full search until a place is picked, then one line; tapping the place reopens it. */}
+      {!loc || heroOpen ? (
+        <section className="hero-glow -mx-4 px-4 pt-10 pb-8">
+          <div className="mx-auto max-w-2xl text-center">
+            <h1 className="text-balance text-3xl font-bold tracking-tight sm:text-4xl">
+              What&apos;s posted around LA.
+            </h1>
+            <p className="mx-auto mt-3 max-w-xl text-pretty text-white/60">
+              Shows, markets, game nights, open mics and the small stuff that never makes the big
+              ticketing sites, all on one pole. No login, just your corner of LA.
+            </p>
+            <div className="mt-6">{searchForm}</div>
             <button
-              type="submit"
-              className="rounded-full bg-[#ffe45c] px-5 py-3 text-sm font-semibold text-[#1a1a1a] hover:bg-[#fff08a]"
+              onClick={useMyLocation}
+              className="mt-3 text-sm text-white/50 underline-offset-4 hover:text-white/80 hover:underline"
             >
-              Find events
+              or use my current location
             </button>
-          </form>
-          <button
-            onClick={useMyLocation}
-            className="mt-3 text-sm text-white/50 underline-offset-4 hover:text-white/80 hover:underline"
-          >
-            or use my current location
-          </button>
-          <div className="mx-auto mt-4 flex max-w-2xl flex-wrap justify-center gap-1.5" aria-label="Neighborhoods">
-            {LAUNCH_AREAS.map((a) => (
+            <div className="mx-auto mt-4 max-w-2xl">{areaChips}</div>
+            {loc && (
               <button
-                key={a.name}
-                type="button"
-                onClick={() => pickArea(a)}
-                className={`rounded-full px-3 py-1 text-xs transition ${
-                  loc?.label === a.name ? "bg-[#ffe45c] text-[#1a1a1a]" : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
-                }`}
+                onClick={() => setHeroOpen(false)}
+                className="mt-4 text-xs text-white/40 underline-offset-4 hover:text-white/70 hover:underline"
               >
-                {a.name}
+                Keep {placeName(loc)}
               </button>
-            ))}
+            )}
           </div>
-        </div>
-      </section>
+        </section>
+      ) : (
+        <section className="pt-5 pb-4">
+          <button
+            onClick={() => setHeroOpen(true)}
+            aria-label={`Change place (now ${placeName(loc)})`}
+            className="text-left text-xl font-bold tracking-tight sm:text-2xl"
+          >
+            What&apos;s posted around{" "}
+            <span className="whitespace-nowrap text-[#ffe45c] underline decoration-[#ffe45c]/40 underline-offset-4">
+              {placeName(loc)}
+              <span className="ml-1 text-base text-[#ffe45c]/70" aria-hidden>▾</span>
+            </span>
+          </button>
+        </section>
+      )}
 
       {/* Results + side ad rail (rail is desktop-only to keep phones light) */}
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-8">
         <div className="min-w-0">
-      {/* Context + view switch + filters */}
       {loc && (
-        <div className="mb-4 space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-white/50">
-              Showing events near <span className="text-white/80">{loc.label}</span>
-              {!loading && <span className="text-white/30"> · {visible.length} found</span>}
-            </p>
-            <div className="inline-flex rounded-full border border-white/10 bg-white/5 p-0.5 text-xs font-medium">
-              {(["list", "table", "map"] as View[]).map((v) => (
-                <button
-                  key={v}
-                  onClick={() => setView(v)}
-                  className={`rounded-full px-3 py-1 capitalize transition ${
-                    view === v ? "bg-white text-black" : "text-white/60 hover:text-white"
-                  }`}
-                >
-                  {v === "list" ? "📋 List" : v === "table" ? "🗂 Table" : "🗺 Map"}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {FILTERS.map((f) => (
+        <div ref={controlsRef} className="mb-4 flex scroll-mt-16 items-start gap-3">
+          <div className="flex shrink-0 flex-col gap-0.5 rounded-2xl border border-white/10 bg-white/5 p-0.5 text-xs font-medium" aria-label="View">
+            {(["list", "map"] as View[]).map((v) => (
               <button
-                key={f.key}
-                onClick={() => setFilter(f.key)}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                  filter === f.key
-                    ? "bg-white text-black"
-                    : "bg-white/5 text-white/60 hover:bg-white/10"
+                key={v}
+                onClick={() => (v === "map" ? openMap() : setView("list"))}
+                aria-pressed={view === v}
+                className={`rounded-xl px-3 py-1 text-left transition ${
+                  view === v ? "bg-white text-black" : "text-white/60 hover:text-white"
                 }`}
               >
-                {f.label}
+                {v === "list" ? "📋 List" : "🗺 Map"}
               </button>
             ))}
           </div>
+          {typeChips(false)}
         </div>
       )}
 
@@ -304,12 +366,34 @@ export default function Home() {
 
       {!loading && !loc && !error && <EmptyState hasLocation={false} />}
 
-      {!loading && loc && visible.length > 0 && view === "table" && (
-        <EventsTable events={visible} />
-      )}
-
       {!loading && loc && visible.length > 0 && view === "map" && (
-        <EventsMap events={visible} center={[loc.lat, loc.lng]} />
+        <div>
+          <div className="mb-2 flex items-center justify-between gap-2 rounded-full border border-white/10 bg-white/5 p-1">
+            <button
+              onClick={() => setMapDay(shiftDay(shownDay, -1))}
+              disabled={shownDay <= todayKey()}
+              aria-label="Previous day"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-lg text-white/80 hover:bg-white/10 disabled:opacity-25 disabled:hover:bg-transparent"
+            >
+              ‹
+            </button>
+            <p className="text-sm font-semibold" aria-live="polite">
+              {formatDayLabel(dayIso(shownDay))}
+              <span className="ml-2 font-normal text-white/40">
+                {mapEvents.length === 0 ? "nothing posted" : `${mapEvents.length} ${mapEvents.length === 1 ? "event" : "events"}`}
+              </span>
+            </p>
+            <button
+              onClick={() => setMapDay(shiftDay(shownDay, 1))}
+              disabled={shownDay >= lastDay}
+              aria-label="Next day"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-lg text-white/80 hover:bg-white/10 disabled:opacity-25 disabled:hover:bg-transparent"
+            >
+              ›
+            </button>
+          </div>
+          <EventsMap events={mapEvents} center={[loc.lat, loc.lng]} />
+        </div>
       )}
 
       {!loading && view === "list" && featured.length > 0 && (
@@ -335,6 +419,7 @@ export default function Home() {
                   {formatDayLabel(startedBefore(dayEvents[0]) ? new Date().toISOString() : dayEvents[0].starts_at)}
                   <span className="ml-2 normal-case tracking-normal text-white/25">{dayEvents.length} {dayEvents.length === 1 ? "event" : "events"}</span>
                 </h2>
+                <div className="flex shrink-0 items-center gap-1.5">
                 {dayEvents.length > PAGE && (
                   <div className="inline-flex shrink-0 rounded-full border border-white/10 bg-white/5 p-0.5 text-[11px] font-medium" aria-label="How many to show">
                     {[["Top 25", PAGE], ["50", PAGE * 2], ["All", Infinity]].filter(([, n]) => n === Infinity || n === PAGE || (n as number) < dayEvents.length).map(([label, n]) => {
@@ -348,6 +433,27 @@ export default function Home() {
                     })}
                   </div>
                 )}
+                  <button
+                    onClick={() => setSheetOpen(true)}
+                    aria-label="Change place or event type"
+                    className="relative flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
+                  >
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                      <path d="M4 6h16M7 12h10M10 18h4" />
+                    </svg>
+                    {filter !== "all" && <span className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-[#ffe45c]" />}
+                  </button>
+                  <button
+                    onClick={() => openMap(key)}
+                    aria-label="See this day on the map"
+                    className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
+                  >
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden>
+                      <path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z" />
+                      <path d="M9 4v14M15 6v14" />
+                    </svg>
+                  </button>
+                </div>
               </div>
               <div className="mt-2 space-y-3">
                 {dayEvents.slice(0, limit).map((ev) => (
@@ -390,6 +496,34 @@ export default function Home() {
 
         <AdRail area={area} />
       </div>
+
+      {sheetOpen && loc && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center" onClick={() => setSheetOpen(false)}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Change place or event type"
+            onClick={(e) => e.stopPropagation()}
+            className="max-h-[85vh] w-full max-w-lg space-y-5 overflow-y-auto rounded-t-3xl border border-white/10 bg-[#2b2119] p-5 pb-8 sm:rounded-3xl"
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-white/50">Where</h2>
+              <button onClick={() => setSheetOpen(false)} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-full text-white/60 hover:bg-white/10 hover:text-white">
+                ✕
+              </button>
+            </div>
+            {searchForm}
+            <div className="text-center">
+              <button onClick={useMyLocation} className="text-sm text-white/50 underline-offset-4 hover:text-white/80 hover:underline">
+                or use my current location
+              </button>
+            </div>
+            {areaChips}
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-white/50">What</h2>
+            {typeChips(true)}
+          </div>
+        </div>
+      )}
     </main>
   );
 }
@@ -398,6 +532,22 @@ export default function Home() {
 function startedBefore(ev: NearbyEvent) {
   return dayKey(ev.starts_at) < dayKey(new Date().toISOString());
 }
+
+/** The day an event is listed under (a run that started earlier sits under today). */
+function eventDay(ev: NearbyEvent) {
+  return dayKey(startedBefore(ev) ? new Date().toISOString() : ev.starts_at);
+}
+
+const todayKey = () => dayKey(new Date().toISOString());
+// Noon in LA for a YYYY-MM-DD key, so formatting never slips a day.
+const dayIso = (key: string) => `${key}T20:00:00Z`;
+function shiftDay(key: string, n: number) {
+  const d = new Date(dayIso(key));
+  d.setUTCDate(d.getUTCDate() + n);
+  return dayKey(d.toISOString());
+}
+
+const placeName = (l: Loc) => (l.label === "your location" ? "you" : l.label);
 
 // Street-flyer paper colors; each event keeps the same color and tilt on every visit.
 const PAPER = ["#ffe45c", "#ff9ec0", "#8ed8f8", "#b9ef9b", "#ffbf73", "#fffdf7"];

@@ -160,7 +160,7 @@ export default function EventsMap({
     <div className="overflow-hidden rounded-2xl border border-white/10" style={{ height: "70vh" }}>
       {failed ? (
         <div className="flex h-full items-center justify-center px-6 text-center text-sm text-white/50">
-          This browser can&apos;t draw the map. The list and table views still show every event.
+          This browser can&apos;t draw the map. The list view still shows every event.
         </div>
       ) : (
         <div ref={containerRef} className="events-map h-full w-full" style={{ background: "#0a0a0f" }} />
