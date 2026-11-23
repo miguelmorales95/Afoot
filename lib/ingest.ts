@@ -44,10 +44,47 @@ async function staleOccurrences(eventId: string, listed: number[]) {
 }
 
 /**
+ * Check if an exact occurrence already exists (same venue, same date, same hour).
+ * Returns the event_id if found, null otherwise.
+ */
+async function checkExactOccurrence(
+  venueId: string,
+  startTime: string,
+): Promise<string | null> {
+  const dateStr = startTime.split("T")[0];
+  const hour = new Date(startTime).getHours();
+
+  const { data } = await supabase
+    .from("event_occurrences")
+    .select("event_id")
+    .eq("event_id:events.venue_id", venueId)
+    .gte("starts_at", `${dateStr}T00:00:00+00:00`)
+    .lt("starts_at", `${dateStr}T23:59:59+00:00`)
+    .single();
+
+  if (data?.event_id) {
+    const { data: occ } = await supabase
+      .from("event_occurrences")
+      .select("starts_at")
+      .eq("id", data.event_id)
+      .single();
+
+    if (occ) {
+      const occHour = new Date(occ.starts_at).getHours();
+      if (Math.abs(occHour - hour) <= 1) return data.event_id;
+    }
+  }
+
+  return null;
+}
+
+/**
  * Upsert a batch of extracted events (and their occurrences) for one venue.
  * Idempotent: events keyed by dedupe_key; future occurrences updated in place, and dates the
  * source dropped removed (or marked cancelled if anyone RSVP'd or chatted).
  * Shared by website ingestion and newsletter ingestion.
+ *
+ * Phase 1 Dedup: Skip exact occurrences (same venue + same date + same hour).
  */
 export async function storeExtractedEvents(opts: {
   venueId: string;
@@ -96,22 +133,37 @@ export async function storeExtractedEvents(opts: {
         return !Number.isNaN(t) && t >= Date.now() - 12 * 3600 * 1000;
       });
 
+    // Phase 1 Dedup: Filter out exact occurrences (same venue + same date + same hour)
+    const filteredRows = [];
+    for (const row of rows) {
+      const existing = await checkExactOccurrence(opts.venueId, row.starts_at);
+      if (existing) {
+        log(`  ~ skipped: "${ev.title}" (exact occurrence already exists)`);
+      } else {
+        filteredRows.push(row);
+      }
+    }
+
+    if (filteredRows.length < rows.length) {
+      log(`  deduplicated ${rows.length - filteredRows.length} exact occurrence(s)`);
+    }
+
     // Dates the page no longer lists fall off, but never by deleting a date people said they're
     // going to or chatted about: those are marked cancelled instead (deleting would take their
     // RSVPs and messages with it). Dates still listed are updated in place, keeping their id.
-    const dropped = await staleOccurrences(eventRow.id, rows.map((r) => Date.parse(r.starts_at)));
+    const dropped = await staleOccurrences(eventRow.id, filteredRows.map((r) => Date.parse(r.starts_at)));
     if (dropped.keep.length) {
       await supabase.from("event_occurrences").update({ cancelled: true }).in("id", dropped.keep);
       log(`  ~ "${ev.title}": ${dropped.keep.length} dropped date(s) have RSVPs or chat; marked cancelled`);
     }
     if (dropped.remove.length) await supabase.from("event_occurrences").delete().in("id", dropped.remove);
 
-    if (rows.length) {
+    if (filteredRows.length) {
       const { error: occErr } = await supabase
         .from("event_occurrences")
-        .upsert(rows, { onConflict: "event_id,starts_at" });
+        .upsert(filteredRows, { onConflict: "event_id,starts_at" });
       if (occErr) log(`  ! occurrences for "${ev.title}": ${occErr.message}`);
-      else occurrenceCount += rows.length;
+      else occurrenceCount += filteredRows.length;
     }
   }
 

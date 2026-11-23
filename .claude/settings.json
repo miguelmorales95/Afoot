@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p ~/Afoot/docs/discovery-strategy)"
+    ],
+    "additionalDirectories": [
+      "/home/migs/Afoot/docs"
+    ]
+  }
+}
