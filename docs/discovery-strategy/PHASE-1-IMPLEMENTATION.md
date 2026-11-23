@@ -24,18 +24,22 @@ Added:
 - Phase 1 filtering: before inserting occurrences, checks for exact matches and skips them
 - Logging: "deduplicated N exact occurrence(s)" when duplicates are caught
 
-**How it works:**
+**How it works (corrected 2026-11-23, `duplicateDates()` in `lib/ingest.ts`):**
 ```
 For each event in ingest:
   1. Create event record (upsert by dedupe_key, idempotent)
   2. Build occurrence rows (future dates, valid times)
-  3. FOR EACH row:
-     - Check: does this occurrence already exist in DB?
-     - If yes: skip insertion, log "skipped: existing occurrence"
-     - If no: add to filtered list
-  4. Upsert filtered list
-  5. Log how many were deduplicated
+  3. Dates this event already has are always kept (otherwise the stale-date step would
+     delete them on every re-import)
+  4. For its new dates, one query: another active event at the same venue, with a matching
+     title (same words, or one contains the other; titles under 6 letters must match
+     exactly), starting within an hour -> skip that date
+  5. Different events at the same time (a museum film and a tour) don't match on title, so
+     both stay
+  6. If the check fails, nothing is skipped: the import never stops on dedup
 ```
+The first version matched venue + hour only, and its query filter never matched, so it did
+nothing; written as intended it would have deleted events' own dates and same-time events.
 
 **Result:** Same event from newsletter + venue calendar won't create duplicate occurrences.
 

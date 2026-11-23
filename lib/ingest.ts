@@ -43,39 +43,42 @@ async function staleOccurrences(eventId: string, listed: number[]) {
   return { keep: stale.filter((id) => used.has(id)), remove: stale.filter((id) => !used.has(id)) };
 }
 
+const HOUR = 3600 * 1000;
+const normTitle = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+/** Same title, or one contains the other ("Trivia" vs "Trivia Night at the Bar"), ignoring case and punctuation. */
+export function sameTitle(a: string, b: string): boolean {
+  const x = normTitle(a), y = normTitle(b);
+  if (!x || !y) return false;
+  return x === y || (Math.min(x.length, y.length) >= 6 && (x.includes(y) || y.includes(x)));
+}
+
 /**
- * Check if an exact occurrence already exists (same venue, same date, same hour).
- * Returns the event_id if found, null otherwise.
+ * Phase 1 dedup: new dates of this event that another event at the same venue already lists
+ * with a matching title within an hour (the same event reached us twice, e.g. newsletter and
+ * calendar). Different events at the same time (a film and a tour) don't match on title and are
+ * kept. Dates this event already has are never skipped, so re-imports can't delete them.
  */
-async function checkExactOccurrence(
-  venueId: string,
-  startTime: string,
-): Promise<string | null> {
-  const dateStr = startTime.split("T")[0];
-  const hour = new Date(startTime).getHours();
-
-  const { data } = await supabase
+async function duplicateDates(venueId: string, eventId: string, title: string, starts: string[]): Promise<Set<string>> {
+  if (!starts.length) return new Set();
+  const { data: own } = await supabase.from("event_occurrences").select("starts_at").eq("event_id", eventId);
+  const ownTimes = new Set((own ?? []).map((o) => Date.parse(o.starts_at)));
+  const fresh = starts.filter((s) => !ownTimes.has(Date.parse(s)));
+  if (!fresh.length) return new Set();
+  const times = fresh.map(Date.parse);
+  const { data, error } = await supabase
     .from("event_occurrences")
-    .select("event_id")
-    .eq("event_id:events.venue_id", venueId)
-    .gte("starts_at", `${dateStr}T00:00:00+00:00`)
-    .lt("starts_at", `${dateStr}T23:59:59+00:00`)
-    .single();
-
-  if (data?.event_id) {
-    const { data: occ } = await supabase
-      .from("event_occurrences")
-      .select("starts_at")
-      .eq("id", data.event_id)
-      .single();
-
-    if (occ) {
-      const occHour = new Date(occ.starts_at).getHours();
-      if (Math.abs(occHour - hour) <= 1) return data.event_id;
-    }
-  }
-
-  return null;
+    .select("starts_at, event:events!inner(id, venue_id, title, status)")
+    .eq("event.venue_id", venueId)
+    .neq("event_id", eventId)
+    .eq("cancelled", false)
+    .gte("starts_at", new Date(Math.min(...times) - HOUR).toISOString())
+    .lte("starts_at", new Date(Math.max(...times) + HOUR).toISOString())
+    .limit(2000);
+  if (error || !data) return new Set(); // never block an import on the dedup check
+  const others = (data as unknown as { starts_at: string; event: { title: string; status: string } }[])
+    .filter((o) => o.event.status === "active" && sameTitle(title, o.event.title))
+    .map((o) => Date.parse(o.starts_at));
+  return new Set(fresh.filter((s) => others.some((t) => Math.abs(t - Date.parse(s)) <= HOUR)));
 }
 
 /**
@@ -83,8 +86,6 @@ async function checkExactOccurrence(
  * Idempotent: events keyed by dedupe_key; future occurrences updated in place, and dates the
  * source dropped removed (or marked cancelled if anyone RSVP'd or chatted).
  * Shared by website ingestion and newsletter ingestion.
- *
- * Phase 1 Dedup: Skip exact occurrences (same venue + same date + same hour).
  */
 export async function storeExtractedEvents(opts: {
   venueId: string;
@@ -133,20 +134,9 @@ export async function storeExtractedEvents(opts: {
         return !Number.isNaN(t) && t >= Date.now() - 12 * 3600 * 1000;
       });
 
-    // Phase 1 Dedup: Filter out exact occurrences (same venue + same date + same hour)
-    const filteredRows = [];
-    for (const row of rows) {
-      const existing = await checkExactOccurrence(opts.venueId, row.starts_at);
-      if (existing) {
-        log(`  ~ skipped: "${ev.title}" (exact occurrence already exists)`);
-      } else {
-        filteredRows.push(row);
-      }
-    }
-
-    if (filteredRows.length < rows.length) {
-      log(`  deduplicated ${rows.length - filteredRows.length} exact occurrence(s)`);
-    }
+    const dupes = await duplicateDates(opts.venueId, eventRow.id, ev.title, rows.map((r) => r.starts_at));
+    const filteredRows = rows.filter((r) => !dupes.has(r.starts_at));
+    if (dupes.size) log(`  ~ "${ev.title}": ${dupes.size} date(s) already listed by a matching event here; skipped`);
 
     // Dates the page no longer lists fall off, but never by deleting a date people said they're
     // going to or chatted about: those are marked cancelled instead (deleting would take their
