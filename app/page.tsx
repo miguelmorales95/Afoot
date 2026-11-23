@@ -427,7 +427,7 @@ function EventCard({ ev, feedback, featured }: { ev: NearbyEvent; feedback: bool
             ? `Until ${formatShortDate(ev.ends_at)}`
             : `${formatTime(ev.starts_at)}${
                 (ev as any).occurrence_count_remaining
-                  ? ` (+${(ev as any).occurrence_count_remaining} more time${(ev as any).occurrence_count_remaining === 1 ? "" : "s"} today)`
+                  ? ` (+${(ev as any).occurrence_count_remaining} more time${(ev as any).occurrence_count_remaining === 1 ? "" : "s"})`
                   : ""
               }`}
         </time>
@@ -459,6 +459,11 @@ function EventCard({ ev, feedback, featured }: { ev: NearbyEvent; feedback: bool
           {ev.venue_name} · {formatDistance(ev.distance_km)} away
           {ev.price ? ` · ${ev.price_is_usual ? "usually " : ""}${ev.price}` : ""}
         </p>
+        {(ev as any).last_occurrence_date && (
+          <p className="mt-0.5 text-xs font-medium text-black/60">
+            Until {formatShortDate((ev as any).last_occurrence_date)}
+          </p>
+        )}
         {(ev.venue_parking || ev.venue_good_to_know) && (
           <p className="mt-0.5 text-xs text-black/60">
             {ev.venue_parking ? `🅿️ ${ev.venue_parking}` : ""}

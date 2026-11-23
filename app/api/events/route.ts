@@ -68,6 +68,16 @@ function groupByEventAndDate(occurrences: any[]) {
     groups.get(key)!.push(occ);
   }
 
+  // Track last occurrence date for each event (for recurring events)
+  const eventLastDate = new Map<string, Date>();
+  for (const occ of occurrences) {
+    const occDate = new Date(occ.starts_at);
+    const lastKnown = eventLastDate.get(occ.event_id);
+    if (!lastKnown || occDate > lastKnown) {
+      eventLastDate.set(occ.event_id, occDate);
+    }
+  }
+
   // For each group, keep the first (soonest) and add count
   const result = [];
   for (const [, occs] of groups) {
@@ -75,11 +85,13 @@ function groupByEventAndDate(occurrences: any[]) {
     occs.sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
     const nextOcc = occs[0];
 
-    // Add count of additional times that day
+    // Add count of additional times that day + last date if recurring
+    const lastDate = eventLastDate.get(nextOcc.event_id);
     result.push({
       ...nextOcc,
       occurrence_count_today: occs.length,
       occurrence_count_remaining: Math.max(0, occs.length - 1),
+      last_occurrence_date: nextOcc.is_recurring && lastDate ? lastDate.toISOString() : null,
     });
   }
 
