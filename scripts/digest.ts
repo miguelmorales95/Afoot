@@ -30,29 +30,28 @@ function laParts(d = new Date()) {
   return { weekday: p.weekday as string, hour: Number(p.hour), day: `${p.year}-${p.month}-${p.day}` };
 }
 const laDate = (iso: string) => new Date(iso).toLocaleString("en-US", { timeZone: "America/Los_Angeles", weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-/** One forced tool call, so the answer always arrives as a parsed object (no hand-written JSON to break). */
+// Structured outputs (output_config.format): the reply is guaranteed to match the schema, so a stray
+// quote can't break it. The installed SDK predates the field's types; it sends the body as given.
 async function structured<T>(o: { model: string; system: string; prompt: string; schema: Record<string, unknown>; maxTokens: number }): Promise<T> {
-  const msg = await new Anthropic().messages.create({
+  const params = {
     model: o.model, max_tokens: o.maxTokens, system: o.system,
-    tools: [{ name: "answer", description: "Return the answer.", input_schema: { type: "object", ...o.schema } as Anthropic.Tool.InputSchema }],
-    tool_choice: { type: "tool", name: "answer" },
     messages: [{ role: "user", content: o.prompt }],
-  });
-  const block = msg.content.find((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
-  if (!block) throw new Error(`no answer (stop: ${msg.stop_reason})`);
-  return block.input as T;
+    output_config: { format: { type: "json_schema", schema: o.schema } },
+  } as unknown as Anthropic.MessageCreateParamsNonStreaming;
+  const msg = await new Anthropic().messages.create(params);
+  if (msg.stop_reason !== "end_turn") throw new Error(`no answer (stop: ${msg.stop_reason})`);
+  const text = msg.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("");
+  return JSON.parse(text) as T;
 }
 const str = { type: "string" }, ids = { type: "array", items: str };
-const PLAN_SCHEMA = {
-  properties: {
-    subject: str, opening: str, summary: str, planVenueIds: ids,
-    todo: { type: "array", items: { type: "object", properties: { title: str, why: str, minutes: { type: "integer" } }, required: ["title"] } },
-    research: { type: "array", items: { type: "object", properties: { eventId: str, ask: str }, required: ["eventId"] } },
-    go: { type: ["object", "null"], properties: { area: str, venueIds: ids, opener: str } },
-    ideas: { type: "array", items: { type: "object", properties: { idea: str, firstStep: str }, required: ["idea"] } },
-  },
-  required: ["subject", "opening", "todo"],
-};
+const obj = (properties: Record<string, unknown>) => ({ type: "object", properties, required: Object.keys(properties), additionalProperties: false });
+const PLAN_SCHEMA = obj({
+  subject: str, opening: str, summary: str, planVenueIds: ids,
+  todo: { type: "array", items: obj({ title: str, why: str, minutes: { type: "integer" } }) },
+  research: { type: "array", items: obj({ eventId: str, ask: str }) },
+  go: obj({ area: str, venueIds: ids, opener: str }),  // venueIds empty = no trip this time
+  ideas: { type: "array", items: obj({ idea: str, firstStep: str }) },
+});
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 
@@ -115,9 +114,9 @@ async function writeDigest(kind: Exclude<Kind, "alert">, facts: Record<string, u
   const system = `You write short, warm, direct emails to a solo founder about his events app. ${CONTEXT}
 How to rank (the founder's own words; follow them):
 ${ranking}
-Answer with the answer tool: subject (under 60 chars), opening (1–2 sentences), todo [{title, why, minutes}],
+Answer in the JSON format: subject (under 60 chars), opening (1–2 sentences), todo [{title, why, minutes}],
 research [{eventId, ask}] (0–3 picked from researchCandidates, highest traffic first; ask = what to look up),
-go {area, venueIds, opener} or null, ideas [{idea, firstStep}] (Saturday only, else []),
+go {area, venueIds, opener} (empty venueIds when no trip fits), ideas [{idea, firstStep}] (Saturday only, else []),
 planVenueIds (Monday only, else []), summary (Monday only, else ""). Use only ids that appear in the facts.`;
   return structured<Plan>({ model: DIGEST_MODEL, system, prompt: `${KIND_BRIEF[kind]}\n\nFacts (JSON):\n${JSON.stringify(facts)}`, schema: PLAN_SCHEMA, maxTokens: 3000 });
 }
@@ -186,7 +185,7 @@ async function highTraffic(items: ResearchItem[], ranking: string): Promise<{ id
     model: ALERT_MODEL, maxTokens: 1500,
     system: `You score LA events for traffic potential on Afoot, a small-events site. ${ranking}\nList in "high" only events scoring 4 or 5 (big draw, broadly appealing, likely shared). ask = what Miguel should look up. Use only the given ids.`,
     prompt: JSON.stringify(list),
-    schema: { properties: { high: { type: "array", items: { type: "object", properties: { id: str, score: { type: "integer" }, ask: str }, required: ["id", "score", "ask"] } } }, required: ["high"] },
+    schema: obj({ high: { type: "array", items: obj({ id: str, score: { type: "integer" }, ask: str }) } }),
   });
   const ids = new Set(list.map((l) => l.id));
   return (answer.high ?? [])
