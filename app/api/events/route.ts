@@ -42,6 +42,62 @@ export async function GET(req: NextRequest) {
     if (!page || page.length < PAGE) break;
   }
 
+  // Group by event + date, keep next occurrence + count per day
+  const grouped = groupByEventAndDate(data as any[]);
+
   // `feedback`: events come from the database, so flags and checks can be saved.
-  return NextResponse.json({ events: data, feedback: true });
+  return NextResponse.json({ events: grouped, feedback: true });
+}
+
+/**
+ * Group occurrences by event + date (LA timezone).
+ * For each group, keep the next occurrence and add occurrence_count_today.
+ */
+function groupByEventAndDate(occurrences: any[]) {
+  const tz = "America/Los_Angeles";
+  const groups = new Map<string, any[]>();
+
+  for (const occ of occurrences) {
+    // Format: YYYY-MM-DD in LA timezone
+    const date = new Date(occ.starts_at).toLocaleDateString("en-CA", { timeZone: tz });
+    const key = `${occ.event_id}:${date}`;
+
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+    groups.get(key)!.push(occ);
+  }
+
+  // For each group, keep the first (soonest) and add count
+  const result = [];
+  for (const [, occs] of groups) {
+    // Sort by start time, keep earliest
+    occs.sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
+    const nextOcc = occs[0];
+
+    // Add count of additional times that day
+    result.push({
+      ...nextOcc,
+      occurrence_count_today: occs.length,
+      occurrence_count_remaining: Math.max(0, occs.length - 1),
+    });
+  }
+
+  // Re-sort by original order (date, traffic, going_count, start time, distance)
+  return result.sort((a, b) => {
+    const dateA = new Date(a.starts_at).toLocaleDateString("en-CA", { timeZone: tz });
+    const dateB = new Date(b.starts_at).toLocaleDateString("en-CA", { timeZone: tz });
+    if (dateA !== dateB) return dateA.localeCompare(dateB);
+
+    const trafficDiff = (b.traffic_score ?? 0) - (a.traffic_score ?? 0);
+    if (trafficDiff !== 0) return trafficDiff;
+
+    const goingDiff = (b.going_count ?? 0) - (a.going_count ?? 0);
+    if (goingDiff !== 0) return goingDiff;
+
+    const timeDiff = new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime();
+    if (timeDiff !== 0) return timeDiff;
+
+    return (a.distance_km ?? 0) - (b.distance_km ?? 0);
+  });
 }

@@ -423,7 +423,13 @@ function EventCard({ ev, feedback, featured }: { ev: NearbyEvent; feedback: bool
           dateTime={ev.starts_at}
           className="rounded-md bg-black/[0.08] py-1 text-center text-sm font-bold text-[#1a1a1a]"
         >
-          {startedBefore(ev) && ev.ends_at ? `Until ${formatShortDate(ev.ends_at)}` : formatTime(ev.starts_at)}
+          {startedBefore(ev) && ev.ends_at
+            ? `Until ${formatShortDate(ev.ends_at)}`
+            : `${formatTime(ev.starts_at)}${
+                (ev as any).occurrence_count_remaining
+                  ? ` (+${(ev as any).occurrence_count_remaining} more time${(ev as any).occurrence_count_remaining === 1 ? "" : "s"} today)`
+                  : ""
+              }`}
         </time>
         <VenueMiniMap lat={ev.venue_lat} lng={ev.venue_lng} venue={ev.venue_name} />
       </div>
