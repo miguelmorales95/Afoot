@@ -7,7 +7,7 @@
 // Needs RESEND_API_KEY, FOUNDER_EMAIL, ANTHROPIC_API_KEY and the Supabase variables.
 import "./env";
 import { supabase } from "../lib/supabase";
-import { complete, extractJson } from "../lib/llm";
+import Anthropic from "@anthropic-ai/sdk";
 import { sendEmail } from "../lib/email";
 import { actionsSince, getSetting, rankCards, setSetting, venueStats, type VenueStat } from "../lib/founderQueue";
 
@@ -30,6 +30,30 @@ function laParts(d = new Date()) {
   return { weekday: p.weekday as string, hour: Number(p.hour), day: `${p.year}-${p.month}-${p.day}` };
 }
 const laDate = (iso: string) => new Date(iso).toLocaleString("en-US", { timeZone: "America/Los_Angeles", weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+/** One forced tool call, so the answer always arrives as a parsed object (no hand-written JSON to break). */
+async function structured<T>(o: { model: string; system: string; prompt: string; schema: Record<string, unknown>; maxTokens: number }): Promise<T> {
+  const msg = await new Anthropic().messages.create({
+    model: o.model, max_tokens: o.maxTokens, system: o.system,
+    tools: [{ name: "answer", description: "Return the answer.", input_schema: { type: "object", ...o.schema } as Anthropic.Tool.InputSchema }],
+    tool_choice: { type: "tool", name: "answer" },
+    messages: [{ role: "user", content: o.prompt }],
+  });
+  const block = msg.content.find((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
+  if (!block) throw new Error(`no answer (stop: ${msg.stop_reason})`);
+  return block.input as T;
+}
+const str = { type: "string" }, ids = { type: "array", items: str };
+const PLAN_SCHEMA = {
+  properties: {
+    subject: str, opening: str, summary: str, planVenueIds: ids,
+    todo: { type: "array", items: { type: "object", properties: { title: str, why: str, minutes: { type: "integer" } }, required: ["title"] } },
+    research: { type: "array", items: { type: "object", properties: { eventId: str, ask: str }, required: ["eventId"] } },
+    go: { type: ["object", "null"], properties: { area: str, venueIds: ids, opener: str } },
+    ideas: { type: "array", items: { type: "object", properties: { idea: str, firstStep: str }, required: ["idea"] } },
+  },
+  required: ["subject", "opening", "todo"],
+};
+
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 
 interface ResearchItem { eventId: string; title: string; venue: string; startsAt: string; link: string | null; missing: string[]; category: string | null }
@@ -91,12 +115,11 @@ async function writeDigest(kind: Exclude<Kind, "alert">, facts: Record<string, u
   const system = `You write short, warm, direct emails to a solo founder about his events app. ${CONTEXT}
 How to rank (the founder's own words; follow them):
 ${ranking}
-Reply with JSON only: {"subject": string (under 60 chars), "opening": string (1–2 sentences), "todo": [{"title", "why", "minutes"}],
-"research": [{"eventId", "ask"}] (0–3 picked from researchCandidates, highest traffic first; ask = what to look up),
-"go": {"area", "venueIds", "opener"} or null, "ideas": [{"idea", "firstStep"}] (Saturday only, else []),
-"planVenueIds": [] (Monday only), "summary": string (Monday only, else "")}. Use only ids that appear in the facts.`;
-  const raw = await complete({ provider: "anthropic", model: DIGEST_MODEL, system, prompt: `${KIND_BRIEF[kind]}\n\nFacts (JSON):\n${JSON.stringify(facts)}`, maxTokens: 2500 });
-  return JSON.parse(extractJson(raw)) as Plan;
+Answer with the answer tool: subject (under 60 chars), opening (1–2 sentences), todo [{title, why, minutes}],
+research [{eventId, ask}] (0–3 picked from researchCandidates, highest traffic first; ask = what to look up),
+go {area, venueIds, opener} or null, ideas [{idea, firstStep}] (Saturday only, else []),
+planVenueIds (Monday only, else []), summary (Monday only, else ""). Use only ids that appear in the facts.`;
+  return structured<Plan>({ model: DIGEST_MODEL, system, prompt: `${KIND_BRIEF[kind]}\n\nFacts (JSON):\n${JSON.stringify(facts)}`, schema: PLAN_SCHEMA, maxTokens: 3000 });
 }
 
 /** Facts-only email, used when the AI call fails so an email still goes out. */
@@ -159,13 +182,14 @@ function render(kind: Kind, plan: Plan, research: ResearchItem[], goVenues: Venu
 async function highTraffic(items: ResearchItem[], ranking: string): Promise<{ id: string; ask: string }[]> {
   if (!items.length) return [];
   const list = items.slice(0, 80).map((r) => ({ id: r.eventId, title: r.title, venue: r.venue, category: r.category, when: laDate(r.startsAt) }));
-  const raw = await complete({
-    provider: "anthropic", model: ALERT_MODEL, maxTokens: 1500,
-    system: `You score LA events for traffic potential on Afoot, a small-events site. ${ranking}\nReply with JSON only: {"high": [{"id", "score" (1-5), "ask"}]} listing only events scoring 4 or 5 (big draw, broadly appealing, likely shared). ask = what Miguel should look up. Use only the given ids.`,
+  const answer = await structured<{ high?: { id: string; score: number; ask: string }[] }>({
+    model: ALERT_MODEL, maxTokens: 1500,
+    system: `You score LA events for traffic potential on Afoot, a small-events site. ${ranking}\nList in "high" only events scoring 4 or 5 (big draw, broadly appealing, likely shared). ask = what Miguel should look up. Use only the given ids.`,
     prompt: JSON.stringify(list),
+    schema: { properties: { high: { type: "array", items: { type: "object", properties: { id: str, score: { type: "integer" }, ask: str }, required: ["id", "score", "ask"] } } }, required: ["high"] },
   });
   const ids = new Set(list.map((l) => l.id));
-  return ((JSON.parse(extractJson(raw)).high ?? []) as { id: string; score: number; ask: string }[])
+  return (answer.high ?? [])
     .filter((x) => ids.has(x.id) && x.score >= 4).slice(0, 5).map((x) => ({ id: x.id, ask: x.ask }));
 }
 
