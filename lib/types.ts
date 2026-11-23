@@ -27,6 +27,8 @@ export interface NearbyEvent {
   tags: string[] | null;
   starts_at: string; // ISO timestamptz
   ends_at: string | null;
+  /** Last occurrence date for recurring events, used to show "Until DATE" */
+  last_occurrence_date?: string | null;
   venue_id: string;
   venue_name: string;
   venue_address: string | null;
