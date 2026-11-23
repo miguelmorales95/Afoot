@@ -10,7 +10,7 @@ Discover 20–30 new underground LA events per month via newsletters and event-c
 ### Newsletter Discovery
 - [ ] Run Gmail scanner on `miguelmorales32395@gmail.com`
   - `npm install googleapis google-auth-library dotenv`
-  - `node scan-newsletters.js` (uses incognito, one-time OAuth setup)
+  - `npm run scan:inbox` (private window sign-in, one-time OAuth setup; see INBOX-SCAN.md)
   - Review `newsletters.csv` output
 - [ ] Manually identify HIGH-signal newsletters (10–15)
   - Examples: KCRW, LA Taco, Resident Advisor, Unfold, TimeOut LA
@@ -204,7 +204,7 @@ Discover 20–30 new underground LA events per month via newsletters and event-c
 ## Files Reference
 
 - **Main Strategy:** [afoot-discovery-strategy.md](afoot-discovery-strategy.md)
-- **Newsletter Scanner:** [scan-newsletters.js](scan-newsletters.js)
+- **Newsletter Scanner:** [INBOX-SCAN.md](INBOX-SCAN.md)
 - **IG Automation:** [ig-automation-zapier.md](ig-automation-zapier.md)
 - **Finding Curators:** [finding-ig-curators.md](finding-ig-curators.md)
 - **This Checklist:** [afoot-discovery-checklist.md](afoot-discovery-checklist.md)

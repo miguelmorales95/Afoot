@@ -14,8 +14,8 @@ This folder contains the complete strategy for discovering 50–80 new undergrou
 ### 🔍 Deep Dives
 
 #### Part 1: Newsletter Discovery
-- **[afoot-discovery-strategy.md](afoot-discovery-strategy.md)** — Full section on scanning Gmail, finding newsletters, extraction pipeline. Includes `scan-newsletters.js` overview.
-- **[scan-newsletters.js](scan-newsletters.js)** — Node.js script to scan your inbox for event newsletters (Gmail API, local OAuth, one-time setup).
+- **[afoot-discovery-strategy.md](afoot-discovery-strategy.md)** — Full section on scanning Gmail, finding newsletters, extraction pipeline. Scanner: `npm run scan:inbox` (see INBOX-SCAN.md).
+- **[INBOX-SCAN.md](INBOX-SCAN.md)** — `npm run scan:inbox`: sign in to any Google account, get a list of venues/sources to track (setup + how to read results).
 
 #### Part 2: IG Curator Partnerships
 - **[afoot-discovery-strategy.md](afoot-discovery-strategy.md)** — Full section on finding curator accounts, humanized pitch, Zapier automation.
@@ -34,7 +34,7 @@ This folder contains the complete strategy for discovering 50–80 new undergrou
 **This week (Nov 24–30):**
 1. Read [afoot-discovery-checklist.md](afoot-discovery-checklist.md) (get the full picture)
 2. Read [afoot-dedup-decisions.md](afoot-dedup-decisions.md) (understand the ⊙ icon design)
-3. Run `scan-newsletters.js` on your Gmail → see what newsletters you have
+3. Run `npm run scan:inbox` on each Gmail account → see what places and newsletters to track
 
 **Next 2 weeks (Dec 1–15):**
 1. Implement dedup Phase 1–2 (exact + fuzzy match, threshold 80)
