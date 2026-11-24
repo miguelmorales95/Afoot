@@ -206,14 +206,19 @@ Wikipedia page views, refreshed weekly; schools and libraries capped at 40; `dra
 'manual'` is never overwritten), category, one-off vs. weekly, weekend dates, free, title keywords,
 and taps. Taps and card views are counted per event per day in `event_daily` (counts only, sent in
 batches with sendBeacon to `/api/events/seen`); a jump in taps week over week adds a "taking off"
-bonus. Preview without saving: `npm run rank -- --dry`.
+bonus. Small spots first: every event at an indie venue (not an institution like a college, library
+or city calendar, and not a big well-known room) gets `INDIE_BOOST` (+25), picked with the ranking lab
+(`npm run rank:lab`). The run itself lives in `lib/rankRun.ts`: nightly for everything
+(`scripts/rank.ts`), and for just the events the somedude desk adds, the moment they're added.
+Preview without saving: `npm run rank -- --dry`.
 
 ### Duplicates
 
 Same venue, start within an hour, and titles that share their meaningful words are the same
 show (`lib/dedupe.ts`). Imports update the existing event instead of adding a reworded copy (the
-AI rewords titles night to night), runs like "through Dec 24" are stored once, the feed hides any
-twins that slip through, and `npm run merge-dupes` / `npm run dedupe-occurrences` clean stored ones
+AI rewords titles night to night), runs like "through Dec 24" are stored once, a single date that
+falls inside a run the event already has is skipped (the run covers it; the feed hides old ones too),
+the feed hides any twins that slip through, and `npm run merge-dupes` / `npm run dedupe-occurrences` clean stored ones
 (run `--dry-run` first). What we tried and learned: `docs/discovery-strategy/dedup-research-and-learnings.md`.
 
 ### Backfills and one-off scripts
@@ -381,7 +386,8 @@ Search a neighborhood (e.g. *Torrance*) or click **use my current location**.
 ```
 app/
   page.tsx                  # home feed: search + List/Table/Map views + filters
-  submit/page.tsx           # "add a venue" or "add an event" (paste a link) form, no login
+  submit/page.tsx           # "add a venue", "add an event" (paste a link) or "share a source" form, no login
+  somedude/page.tsx         # somedude desk: paste an events page, add what's new (somedudes only)
   admin/page.tsx            # review: submissions, candidates, event links, feeds, flags, sponsors
   privacy/page.tsx          # plain-language privacy page (update when collection changes)
   chat/, inbox/, profile/   # optional sign-in: RSVP-gated event chat, contact requests
@@ -390,7 +396,9 @@ app/
   api/feedback/route.ts     # flags, heads-ups and one-tap checks (thresholds live here)
   api/events/route.ts       # GET nearby events (nearby_events RPC, or demo data)
   api/geocode/route.ts      # GET place name -> lat/lng (Nominatim proxy)
-  api/submit/route.ts       # POST venue submission
+  api/submit/route.ts       # POST venue / event link / source submission
+  api/somedude/route.ts     # somedude desk: parse pasted cards, add events, log the run
+  api/newsletter/{subscribe,confirm,unsubscribe}/route.ts # weekly email signup (double opt-in)
   api/cron/ingest/route.ts  # one-off ingest on Vercel (CRON_SECRET); the daily run is GitHub Actions
   api/inbound-email/route.ts # ⭐ newsletter webhook (provider-agnostic)
   api/admin/sponsors/route.ts # sponsors + campaigns for /admin (ADMIN_TOKEN gated)
@@ -403,6 +411,11 @@ components/
   AdUnit.tsx / AdRail.tsx   # ad slots: sponsor -> network -> house promo
   SponsorCard.tsx           # paid card with "Sponsored" + "Why am I seeing this?"
   SponsorAdmin.tsx          # /admin Sponsors section
+  FeedNotes.tsx             # ads and "take one" ask flyers between posters
+  SourceForm.tsx            # share an Instagram / newsletter / calendar (popup and /submit)
+  PlaceSearch.tsx           # city / neighborhood / ZIP search with autocomplete
+  WeeklyEmailSheet.tsx      # weekly email signup popup
+  SiteHeader.tsx            # header (hides on scroll down, phones only)
 lib/
   llm.ts                    # ⭐ provider-agnostic LLM (Claude OR local Ollama)
   extract.ts                # event extractor (events + recurrence expansion + tags)
@@ -414,6 +427,11 @@ lib/
   calendarFeeds.ts          # read official iCal / Localist calendars (no AI)
   sponsorBilling.ts         # Stripe payment links, invoices and webhook handling for sponsors
   venueMatch.ts             # match an event to an existing venue (name, or within ~60 m)
+  rank.ts / rankRun.ts      # traffic score formula / running it (nightly, or for just-added events)
+  voice.ts                  # card lines in Miguel's voice (Claude)
+  somedude.ts / pageCards.ts # somedude desk: read pasted cards, add events / cut a page into cards
+  weeklyEmail.ts            # weekly email helpers (sender, links, tokens)
+  places.ts                 # LA cities, neighborhoods and ZIPs for the place search
   safeFetch.ts              # fetch only public addresses for user-supplied links
   recheck.ts                # AI clean-up of uncertain events (npm run recheck)
   search.ts                 # web search (DuckDuckGo keyless / Brave API)
@@ -442,13 +460,19 @@ scripts/
   recheck.ts                # CLI: re-check uncertain events
   backup-db.ts / migrate.ts # CLI: back up the database / apply one migration file
   ads-report.ts             # CLI: monthly sponsor reports (npm run ads:report)
+  rank.ts                   # CLI: nightly traffic scores (npm run rank)
+  voice-lines.ts            # CLI: card lines in Miguel's voice (npm run voice-lines)
+  weekly-email.ts           # CLI: the weekly email (npm run weekly-email)
+  rank-lab.ts / voice-lab.ts # CLI: lab pages comparing ranking boosts / ways to mix in his voice
 supabase/
   schema.sql                # tables + nearby_events() + RLS
   seed.sql                  # the 3 starter venues
   migrations/               # changes applied on their own (sponsor campaigns, event links + feeds)
 docs/
   cloudflare-email-worker.js # inbound-email Worker for the newsletter webhook
-.github/workflows/ingest.yml # daily ingest + feeds (GitHub Actions)
+.github/workflows/ingest.yml # daily ingest + feeds + rank + voice lines (GitHub Actions)
+.github/workflows/weekly-email.yml # Thursday weekly email
+.github/workflows/founder-digest.yml # founder emails
 deploy/systemd/             # optional timers on your own computer (recheck, weekly backup)
 SC_2_Afoot/                 # events from screenshots with a local vision model (npm run screenshots)
 ```
@@ -577,23 +601,55 @@ The ✉ button in the header signs someone up with the filters they have on (pla
 Double opt-in: `/api/newsletter/subscribe` emails a confirm link; nothing weekly goes out until it's
 tapped. Subscribers live in `afoot.email_subscribers` (migration `20261125000000_weekly_email.sql`).
 
-- Write this week's note in `content/weekly-note.md` (plain text, your own words).
-- `npm run weekly-email -- --dry-run` writes each email to `.weekly-email/`; `-- --to you@example.com` sends one test
-  (a sample for all of LA if that address hasn't signed up).
-- `npm run weekly-email` sends to everyone confirmed. Picks are the next 7 days by `traffic_score`, one card
-  per venue, 3 per day, 15 max. Needs `RESEND_API_KEY` (and `WEEKLY_EMAIL_FROM` if not miguel@somedude.app).
-- Somedude desk (`/somedude`): the trusted local running a city pastes an events page (Facebook Events
-  tab: Ctrl+A, Ctrl+C; or drops a saved .html) and the new events go straight on the pole. The browser
-  cuts the page into cards (`lib/pageCards.ts`), Claude (Haiku) reads them, each is checked against
-  what's already listed (same day, similar title), and the new ones are stored as `source = "link"`
-  (`lib/somedude.ts`), then ranked (`lib/rankRun.ts`, the nightly formula) and given voice lines right away. Access: rows in `afoot.somedudes` (email, area), added by hand, never from the
-  site. Every run is logged in `afoot.paste_imports`. No quality filter yet: add one before anyone
-  untrusted gets access.
-- Card lines: each card's one line is written in Miguel's voice by Claude (Sonnet) from the listing,
-  facts only (`lib/voice.ts`, picked as "Way 2: rewrite" in `npm run voice:lab`). `npm run voice-lines`
-  fills in new or changed events (nightly, after the rank); `-- --all` rewrites every line after you edit
-  the voice notes. Cards without a line fall back to the keyword gist.
+- Write this week's note in `content/weekly-note.md` (plain text, your own words); it goes on top.
+- Picks: the next 7 days by `traffic_score`, one card per venue, 15 max. Each weekday has its own rules
+  (`DAY_RULES` in `scripts/weekly-email.ts`): 3 picks Fri–Sun and 2 on weeknights; Saturday and Sunday
+  lean daytime, Sunday steers away from late nights, weeknights away from late shows. Within a day, a
+  second pick in the same time of day, or within 90 minutes of another, has to clearly score higher.
+- Looks like the app: wood background, bright poster cards with black time blocks, Anton where the
+  mail app loads web fonts (bold condensed fallbacks in Gmail). Midnight-only listings say "All day".
+- `npm run weekly-email -- --dry-run` writes each email to `.weekly-email/`; `-- --to you@example.com`
+  sends one test (a sample for all of LA if that address hasn't signed up).
+- `npm run weekly-email` sends to everyone confirmed. Needs `RESEND_API_KEY` (and `WEEKLY_EMAIL_FROM` if
+  not miguel@somedude.app).
 - `.github/workflows/weekly-email.yml` sends it Thursday ~7 a.m. LA; anyone sent to in the last 5 days is
   skipped, so reruns don't double-send. Run it by hand from the Actions tab ("to" = one test address).
+
+## Card lines in Miguel's voice
+
+Each card's one line is written in Miguel's voice by Claude (Sonnet) from the listing, facts only:
+no prices, times, contact details or claims he's been there (`lib/voice.ts`; picked as "Way 2:
+rewrite" in `npm run voice:lab`). Saved in `events.voice_line` (migration
+`20261126000000_voice_line.sql`) and shown behind a "GIST" stamp that says, when tapped, a robot
+wrote it trying to sound like him. `npm run voice-lines` fills in new or changed events (nightly,
+after the rank); `-- --all` rewrites every line after you edit the voice notes. Cards without a line
+fall back to the keyword gist.
+
+## Somedude desk (`/somedude`)
+
+The trusted local running a city (a "somedude") pastes an events page and the new events go straight
+on the pole: for sites with no API, or a paid one (Facebook Events, Meetup, Resident Advisor, Luma,
+Partiful, Posh, AllEvents; the desk links to each).
+
+1. On a computer: open the site, scroll so it loads a lot, Ctrl+A, Ctrl+C, paste on the desk. Or
+   save the page (Ctrl+S) and drop the .html file.
+2. The browser cuts the page into short cards with their links (`lib/pageCards.ts`; an 8 MB saved
+   Facebook page becomes ~60 KB). Claude (Haiku) reads them, 20 per call (`lib/somedude.ts`).
+3. Each event is marked new, already on the pole (same day, similar title, any venue) or skipped
+   (already happened, online-only). New ones are checked by default.
+4. Added events are stored as `source = "link"` at their venue (geocoded first, so an address lands
+   on a venue we already have), then ranked and given their voice line right away.
+
+Access is a row in `afoot.somedudes` (email, area), added by hand and never from the site, so emails
+stay out of this public repo. Every run is logged in `afoot.paste_imports` (found, new, added,
+Facebook interested/going counts). There's no quality filter yet; add one before anyone untrusted
+gets access. Roadmap and check-ins: the "Somedude desk: importer roadmap" doc.
+
+## Feed asks
+
+Between posters, kraft "take one" flyers ask for sources: tear-off tickets (Instagram, Newsletter,
+Calendar; for curators, "I'm a curator" / "Suggest one") each open the source form in a popup with
+that type picked (`components/SourceForm.tsx`, also the Source tab on `/submit`). Submissions land in
+`/admin` with the rest.
 
 `npm run rank:lab` builds a page comparing small-spot ranking boosts on real days (read-only).

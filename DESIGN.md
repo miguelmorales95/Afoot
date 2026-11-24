@@ -9,7 +9,7 @@ Afoot follows the **company-wide design system**: see [`Company-Design-System.md
 - **Header** (phones only) slides away while scrolling down and comes back after a deliberate scroll up (~250 px) or near the top; the day header takes its place (`--header-offset`). Screen space goes to events.
 - **Notes between posters** are quieter on purpose, so they never pass for events: **ads** on newsprint (`#e8e3d6`, gray ink, "AD" / "SPONSORED" over a rule, phones and tablets only since desktop has the rail), **asks** (share an Instagram, newsletter or calendar; IG curators) on kraft (`#cdae7e`) with "take one" tear-off tickets down the right edge (Instagram, Newsletter, Calendar). Each ticket is its own button and opens the source form in a popup, with that type picked (`components/SourceForm.tsx`). One before each day's 6th card, then every 12 (`components/FeedNotes.tsx`).
 - **Compact layout** (toggle in the pinned day header, remembered per device): same poster colors and Anton titles, minus the type badge, street map, gist, description and tags; parking stays.
-- **Gist line** (phones): keywords auto-pulled from the listing, behind a small "GIST" stamp that says so when tapped. Honest about being automatic rather than passing as a write-up.
+- **Card line** (all sizes): one short line in Miguel's voice, written by Claude from the listing (facts only), behind a small "GIST" stamp. Tapped, the stamp says plainly a robot wrote it trying to sound like him: one dude covering all of LA, so tap through for details. Cards without a line fall back to the keyword gist (phones): up to 6 bold uppercase keywords, same stamp.
 - **Type:** Anton (heavy condensed gothic, `next/font`, class `font-poster`) for titles, times, day headers and the logo; system sans for everything else, bold and full black on cards.
 - **Logo:** a silver side-view staple gun + "LIGHT" in yellow, "POLE" in pink (`components/SiteHeader.tsx`; PNGs in `branding/`).
 - **Tone:** quick, local, no-friction; privacy-first (no tracking) is part of the brand.
@@ -17,7 +17,7 @@ Afoot follows the **company-wide design system**: see [`Company-Design-System.md
 ## Event card anatomy
 - **Left column:** the time in an inked block with the poster color knocked out ("TIME TBA" when the source gave none; "UNTIL DEC 24" for runs that started earlier), then one bold schedule line ("MON, WED UNTIL 1/6": 3-letter days, commas, no "&"), then a static street map that opens a full map with directions.
 - **Right column:** type badge, title (Anton), venue · distance · price, tags in sentence case ("Live band", "All-ages", "DJ") with a plain "Parking" / "No parking" tag first when known (styled like the rest: people read it as part of the event), then "I'm going" (black pill) and ⚑ on one row.
-- **Phones:** instead of the description, up to 6 bold uppercase keywords separated by dots (from the AI tagline).
+- **Line under the venue:** the card line in Miguel's voice (replaces the listing's description on desktop); without one, desktop shows the description and phones the keyword gist.
 - **Stacking:** cards overlap like pasted posters, no gaps. **Lineup cards** (several shows at one venue that day) list each time + title; "See all" opens same-color cards below without the map, type or venue.
 - **Day headers:** the day in Anton, colored per day; only the pinned header has the filter and map buttons.
 
@@ -36,3 +36,7 @@ Afoot is the company reference for "please check this" UI (see the design system
 - Keep the existing privacy-first ad system; monetization leans on sponsorship / paid venue placement (see the roadmap), not tracking-based ads.
 
 See also the [Company Roadmap & Launch Plan](https://github.com/miguelmorales95/SomeDude_Company/blob/main/Company-Roadmap-and-Launch-Plan.md) for where Afoot sits in the launch sequence (it ships first).
+
+## Somedude desk and emails
+- **Somedude desk** (`/somedude`): same wood and poster type; "Where to look" round site icons, a kraft paste box, then a plain list (new / already on the pole / skipped) with checkboxes. A working page for one trusted person per city, not a public one.
+- **Weekly email:** the app in an inbox: wood background, "LIGHT POLE" lettering, poster-colored cards with a black time block, day names in poster colors, a cream "Everything else on the pole" pill. Tables and inline styles only.
