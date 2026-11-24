@@ -70,3 +70,25 @@ The terminal shows progress; the report path is printed at the end.
    `npm run newsletter:add -- <venue-slug> <sender>`.
 3. **Calendar: public events missing from Light Pole**: the raw misses, with organizer and link
    domains (dice.fm, partiful.com, ra.co…) as hints for which platforms we aren't covering.
+
+## What the first scans found (Nov 2026, one personal account)
+
+Two runs over a year of mail: the local model (qwen2.5 7B) and Claude (`--anthropic`). Claude's
+list was far cleaner (the local run let in Las Vegas venues, a clothing store, performer names as
+"series"), so use `--anthropic` when the key is set.
+
+- **48 LA event senders, only 4 already on Light Pole.** Mostly venues and promoters
+  (Live Nation / Goldenvoice venue lists, LA Opera, Zebulon, The Regent, Culver Arts), plus a few
+  curators (KCRW shows, Meetup groups).
+- **The calendar was the sharper signal.** Of 143 public events on the calendar, none were on
+  Light Pole, and most were *recurring community events*: a weekly run club in a park, weekly
+  board games at a tea lounge, salsa/bachata and cumbia classes, brewery events, a boxing gym.
+  These rarely have a calendar page; **30 of them linked to Instagram**, a few to posh.vip,
+  lu.ma, Eventbrite. That backs the Instagram curator plan over more website crawling.
+- **Big venues need a headless browser.** El Rey, Fonda, Zebulon, The Glass House and LA Opera
+  returned 0 events from the plain page and 4-29 once rendered, so they're flagged `render`.
+
+Acted on: 16 venues with working events pages were added (`data/la-venues-inbox-scan.csv`) and
+their newsletter senders mapped. Still to do by hand: subscribe the Light Pole inbox to those
+newsletters (Zebulon, The Regent, The Wiltern, LA Opera, Crypto.com Arena, Goldenvoice, Culver
+Arts, rocknite), and find the Instagram accounts behind the recurring calendar events.
