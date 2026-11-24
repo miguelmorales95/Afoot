@@ -31,6 +31,8 @@ export interface NearbyEvent {
   last_occurrence_date?: string | null;
   /** Short line shown instead of the description on phones (see ExtractedEvent.tagline). */
   tagline?: string | null;
+  /** Short schedule under the time ("Weekdays"); see ExtractedEvent.schedule_label. */
+  schedule_label?: string | null;
   /** Other showings the same day, folded into this card ("+2 more times"). */
   occurrence_count_remaining?: number;
   venue_id: string;
@@ -123,6 +125,8 @@ export interface ExtractedEvent {
   tags: string[];
   /** Under 10 words saying what it is, never repeating title/venue/date/price. Shown on phones. */
   tagline?: string | null;
+  /** 1-3 words for a recurring schedule ("Weekdays", "Every Tue"). Null for one-offs. */
+  schedule_label?: string | null;
   /** Concrete upcoming date/times, already expanded from any recurrence. */
   occurrences: { start: string; end: string | null }[];
 }

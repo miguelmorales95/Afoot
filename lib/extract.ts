@@ -46,6 +46,10 @@ prizes for the top three". The card already shows the title, venue, neighborhood
 price and tags, so NEVER repeat any of those. No marketing words (amazing, unforgettable,
 don't miss), no "join us". Use null if the text gives nothing beyond what the card shows.
 
+schedule_label: for recurring events only, 1-3 words naming the pattern, e.g. "Daily",
+"Weekdays", "Weekends", "Every Tue", "Tue & Thu", "1st Fridays", "Monthly". No times, no
+exceptions, no dates. null for one-off events.
+
 Respond with a single JSON object and NOTHING else:
 {"events": [ {
   "title": string,
@@ -57,6 +61,7 @@ Respond with a single JSON object and NOTHING else:
   "is_recurring": boolean,
   "tags": string[],                 // 2-5 vibe/activity tags, or []
   "tagline": string | null,         // <= 9 words, nothing the card already shows
+  "schedule_label": string | null,  // recurring only: 1-3 words, e.g. "Weekdays"
   "occurrences": [ { "start": string, "end": string | null } ]
 } ] }
 
@@ -120,6 +125,7 @@ export async function extractEvents(
     .map((e) => ({
       ...e,
       tagline: ((t) => (t && !repeatsCard(t, { title: e.title, venue_name: input.venueName }) ? t : null))(cleanTagline(e.tagline)),
+      schedule_label: e.is_recurring ? cleanScheduleLabel(e.schedule_label, e.recurrence_description) : null,
       tags: Array.isArray(e.tags)
         ? e.tags
             .filter((t): t is string => typeof t === "string")
@@ -136,6 +142,30 @@ export function cleanTagline(t: unknown): string | null {
   const s = t.trim().replace(/^["'“]+|["'”]+$/g, "").replace(/\.$/, "").trim();
   const words = s.split(/\s+/).filter(Boolean).length;
   return words >= 2 && words <= 12 ? s : null;
+}
+
+const DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+/**
+ * A schedule label as the card shows it: 1-4 words, no times, and every weekday it names must
+ * be in the source schedule (so "Every Monday" can't come back as "4th Fri"). Else null.
+ */
+export function cleanScheduleLabel(t: unknown, source?: string | null): string | null {
+  if (typeof t !== "string") return null;
+  const s = t.trim().replace(/\.$/, "");
+  const words = s.split(/\s+/).filter(Boolean).length;
+  if (words < 1 || words > 4 || /\d:\d|\d\s*(am|pm)\b/i.test(s)) return null;
+  if (source) {
+    const src = source.toLowerCase(), lab = s.toLowerCase();
+    if (DAYS.some((d) => new RegExp(`\\b${d}`).test(lab) && !src.includes(d))) return null;
+    if (/weekend/.test(lab) && !/weekend/.test(src) && !(src.includes("sat") && src.includes("sun"))) return null;
+    // "1st", "2nd", "last"… must match the schedule's own ordinal.
+    const ORD: [RegExp, RegExp][] = [
+      [/\b1st\b|\bfirst\b/, /\b1st\b|\bfirst\b/], [/\b2nd\b|\bsecond\b/, /\b2nd\b|\bsecond\b/],
+      [/\b3rd\b|\bthird\b/, /\b3rd\b|\bthird\b/], [/\b4th\b|\bfourth\b/, /\b4th\b|\bfourth\b/], [/\blast\b/, /\blast\b/],
+    ];
+    if (ORD.some(([inLabel, inSrc]) => inLabel.test(lab) && !inSrc.test(src))) return null;
+  }
+  return s;
 }
 
 /** The whole event objects in an "events" array whose JSON was cut off partway. */

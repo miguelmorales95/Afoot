@@ -30,6 +30,7 @@
     "sources:import": "tsx scripts/import-sources.ts",
     "recurring": "tsx scripts/recurring.ts",
     "taglines": "tsx scripts/taglines.ts",
+    "schedule-labels": "tsx scripts/schedule-labels.ts",
     "venue-parking": "tsx scripts/venue-parking.ts",
     "digest": "tsx scripts/digest.ts",
     "rank": "tsx scripts/rank.ts"

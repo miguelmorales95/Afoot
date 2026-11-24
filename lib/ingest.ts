@@ -136,6 +136,7 @@ export async function storeExtractedEvents(opts: {
           tags: ev.tags ?? [],
           // Only when there is one, so a re-import without a tagline keeps the saved one.
           ...(ev.tagline ? { tagline: ev.tagline } : {}),
+          ...(ev.schedule_label ? { schedule_label: ev.schedule_label } : {}),
           source: opts.source,
           dedupe_key: dedupeKey,
           updated_at: new Date().toISOString(),

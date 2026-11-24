@@ -620,8 +620,8 @@ function EventCard({ ev, feedback, featured, paper }: { ev: NearbyEvent; feedbac
             </>
           )}
         </time>
-        {ev.is_recurring && ev.recurrence_description && (
-          <p className="text-center text-[11px] font-bold leading-tight text-black/80">🔁 {ev.recurrence_description}</p>
+        {ev.is_recurring && ev.schedule_label && (
+          <p className="text-center text-[13px] font-extrabold uppercase leading-tight tracking-wide text-[#111]">{ev.schedule_label}</p>
         )}
         <VenueMiniMap lat={ev.venue_lat} lng={ev.venue_lng} venue={ev.venue_name} />
       </div>
