@@ -49,15 +49,16 @@ const ALL_LA: Loc = { lat: 34.05, lng: -118.25, label: "All of LA", all: true };
 const STORAGE_KEY = "afoot_loc";
 const PAGE = 15;
 
+// Nothing picked means everything. "Games" covers game nights and trivia (each was too thin alone).
 const FILTERS: { key: string; label: string }[] = [
-  { key: "all", label: "Everything" },
   { key: "music", label: "🎸 Music" },
-  { key: "karaoke", label: "🎤 Karaoke" },
-  { key: "games", label: "🎲 Games" },
-  { key: "trivia", label: "🧠 Trivia" },
   { key: "comedy", label: "🎭 Comedy" },
+  { key: "class", label: "🎨 Classes" },
+  { key: "games", label: "🧠 Games" },
   { key: "market", label: "🛍️ Markets" },
+  { key: "food", label: "🍽️ Food" },
 ];
+const filterKey = (category: string | null) => (category === "trivia" ? "games" : category ?? "other");
 
 
 export default function Home() {
@@ -180,7 +181,7 @@ export default function Home() {
   };
 
   const visible = useMemo(
-    () => (types.size === 0 ? events : events.filter((e) => types.has(e.category ?? "other"))),
+    () => (types.size === 0 ? events : events.filter((e) => types.has(filterKey(e.category)))),
     [events, types],
   );
 
@@ -240,10 +241,9 @@ export default function Home() {
     scrollToControls();
   };
 
-  // Types combine ("Comedy" + "Music"); "Everything" clears them.
+  // Types combine ("Comedy" + "Music"); tapping a picked one again unpicks it.
   const pickFilter = (key: string) =>
     setTypes((prev) => {
-      if (key === "all") return new Set();
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
@@ -324,9 +324,9 @@ export default function Home() {
         <button
           key={f.key}
           onClick={() => pickFilter(f.key)}
-          aria-pressed={f.key === "all" ? types.size === 0 : types.has(f.key)}
+          aria-pressed={types.has(f.key)}
           className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-            (f.key === "all" ? types.size === 0 : types.has(f.key)) ? "bg-white text-black" : "bg-white/5 text-white/60 hover:bg-white/10"
+            types.has(f.key) ? "bg-white text-black" : "bg-white/5 text-white/60 hover:bg-white/10"
           }`}
         >
           {f.label}

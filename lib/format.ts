@@ -7,8 +7,8 @@ export const CATEGORY_META: Record<
 > = {
   music: { label: "Live Music", emoji: "🎸", className: "bg-fuchsia-500/15 text-fuchsia-300 ring-fuchsia-500/30" },
   karaoke: { label: "Karaoke", emoji: "🎤", className: "bg-pink-500/15 text-pink-300 ring-pink-500/30" },
-  trivia: { label: "Trivia", emoji: "🧠", className: "bg-amber-500/15 text-amber-300 ring-amber-500/30" },
-  games: { label: "Game Night", emoji: "🎲", className: "bg-emerald-500/15 text-emerald-300 ring-emerald-500/30" },
+  trivia: { label: "Games", emoji: "🧠", className: "bg-amber-500/15 text-amber-300 ring-amber-500/30" },
+  games: { label: "Games", emoji: "🧠", className: "bg-emerald-500/15 text-emerald-300 ring-emerald-500/30" },
   comedy: { label: "Comedy", emoji: "🎭", className: "bg-orange-500/15 text-orange-300 ring-orange-500/30" },
   market: { label: "Market", emoji: "🛍️", className: "bg-teal-500/15 text-teal-300 ring-teal-500/30" },
   food: { label: "Food", emoji: "🍽️", className: "bg-red-500/15 text-red-300 ring-red-500/30" },
