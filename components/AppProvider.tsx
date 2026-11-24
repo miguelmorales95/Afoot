@@ -15,8 +15,9 @@ interface AppCtx {
   hasAuth: boolean;
   user: AppUser | null;
   goingSet: Set<string>;
-  signInWithGoogle: () => void;
-  signInWithFacebook: () => void;
+  /** Resolves with a message when that sign-in isn't available (otherwise the page redirects). */
+  signInWithGoogle: () => Promise<string | null>;
+  signInWithFacebook: () => Promise<string | null>;
   signOutUser: () => void;
   requireAuth: () => void; // sign in (real provider or demo)
   toggleGoing: (occurrenceId: string) => void;
@@ -108,15 +109,29 @@ export default function AppProvider({ children }: { children: React.ReactNode })
     void loadGoing(demoUser);
   }, [loadGoing]);
 
-  const oauth = useCallback((provider: "google" | "facebook") => {
-    if (hasAuth && supabaseBrowser) {
-      void supabaseBrowser.auth.signInWithOAuth({
-        provider,
-        options: { redirectTo: `${window.location.origin}/auth/callback` },
-      });
-    } else {
+  const oauth = useCallback(async (provider: "google" | "facebook"): Promise<string | null> => {
+    if (!hasAuth || !supabaseBrowser) {
       signInDemo();
+      return null;
     }
+    const { data, error } = await supabaseBrowser.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: `${window.location.origin}/auth/callback`, skipBrowserRedirect: true },
+    });
+    if (error || !data?.url) return "Sign-in isn't working right now. Please try again later.";
+    // Supabase answers a provider that isn't switched on with a bare JSON error page:
+    // check first so people get a message here instead of landing there.
+    try {
+      const res = await fetch(data.url, { redirect: "manual" });
+      if (res.type !== "opaqueredirect" && res.status >= 400) {
+        const name = provider === "google" ? "Google" : "Facebook";
+        return `Signing in with ${name} isn't available yet.`;
+      }
+    } catch {
+      /* couldn't check: try the redirect anyway */
+    }
+    window.location.assign(data.url);
+    return null;
   }, [signInDemo]);
 
   const signOutUser = useCallback(() => {
@@ -134,7 +149,7 @@ export default function AppProvider({ children }: { children: React.ReactNode })
 
   const requireAuth = useCallback(() => {
     if (userRef.current) return;
-    if (hasAuth) oauth("google");
+    if (hasAuth) void oauth("google").then((msg) => msg && window.alert(msg));
     else signInDemo();
   }, [oauth, signInDemo]);
 

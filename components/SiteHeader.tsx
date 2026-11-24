@@ -68,6 +68,11 @@ function StapleGun() {
 function AuthButton() {
   const { ready, user, hasAuth, signInWithGoogle, signInWithFacebook, signOutUser } = useApp();
   const [open, setOpen] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const tryProvider = async (go: () => Promise<string | null>) => {
+    setProblem(null);
+    setProblem(await go());
+  };
 
   if (!ready) return <div className="h-8 w-20 animate-pulse rounded-full bg-white/5" />;
 
@@ -108,7 +113,7 @@ function AuthButton() {
   return (
     <div className="relative">
       <button
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => { setOpen((o) => !o); setProblem(null); }}
         className="rounded-full bg-[#ffe45c] px-4 py-1.5 text-sm font-semibold text-[#1a1a1a] hover:bg-[#fff08a]"
       >
         Sign in
@@ -118,23 +123,18 @@ function AuthButton() {
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute right-0 z-50 mt-2 w-56 rounded-xl border border-white/10 bg-[#3a2d23] p-2 shadow-xl">
             <button
-              onClick={() => {
-                setOpen(false);
-                signInWithGoogle();
-              }}
+              onClick={() => void tryProvider(signInWithGoogle)}
               className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-white hover:bg-white/10"
             >
               <span>🟦</span> Continue with Google
             </button>
             <button
-              onClick={() => {
-                setOpen(false);
-                signInWithFacebook();
-              }}
+              onClick={() => void tryProvider(signInWithFacebook)}
               className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-white hover:bg-white/10"
             >
               <span>🔵</span> Continue with Facebook
             </button>
+            {problem && <p className="px-3 pt-2 text-xs font-medium text-[#ffbf73]" role="alert">{problem}</p>}
             {!hasAuth && (
               <p className="px-3 pt-2 text-[11px] text-white/40">
                 Demo mode — this creates a local test account. Real sign-in activates once Supabase
