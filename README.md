@@ -578,8 +578,11 @@ Double opt-in: `/api/newsletter/subscribe` emails a confirm link; nothing weekly
 tapped. Subscribers live in `afoot.email_subscribers` (migration `20261125000000_weekly_email.sql`).
 
 - Write this week's note in `content/weekly-note.md` (plain text, your own words).
-- `npm run weekly-email -- --dry-run` writes each email to `.weekly-email/`; `-- --to you@example.com` sends one test.
+- `npm run weekly-email -- --dry-run` writes each email to `.weekly-email/`; `-- --to you@example.com` sends one test
+  (a sample for all of LA if that address hasn't signed up).
 - `npm run weekly-email` sends to everyone confirmed. Picks are the next 7 days by `traffic_score`, one card
   per venue, 3 per day, 15 max. Needs `RESEND_API_KEY` (and `WEEKLY_EMAIL_FROM` if not miguel@somedude.app).
+- `.github/workflows/weekly-email.yml` sends it Thursday ~7 a.m. LA; anyone sent to in the last 5 days is
+  skipped, so reruns don't double-send. Run it by hand from the Actions tab ("to" = one test address).
 
 `npm run rank:lab` builds a page comparing small-spot ranking boosts on real days (read-only).

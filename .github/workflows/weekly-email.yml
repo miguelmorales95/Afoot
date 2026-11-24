@@ -1,0 +1,37 @@
+# The weekly email (scripts/weekly-email.ts) to every confirmed subscriber, Thursday morning in LA.
+# Two cron slots so one lands near 7 a.m. in summer and winter; the script skips anyone sent to in
+# the last 5 days, so the second slot sends nothing. Run it by hand from the Actions tab; "to" sends
+# just a test to that address. Uses the same secrets as the founder emails (RESEND_API_KEY).
+name: Weekly email
+
+on:
+  schedule:
+    - cron: "0 14,15 * * 4"
+  workflow_dispatch:
+    inputs:
+      to:
+        description: "Send only a test to this address (empty: everyone confirmed)"
+        required: false
+        default: ""
+
+concurrency:
+  group: weekly-email
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run weekly-email -- ${TO:+--to "$TO"}
+        env:
+          TO: ${{ inputs.to }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}

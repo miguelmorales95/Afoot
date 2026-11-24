@@ -3,7 +3,8 @@
 // the note in content/weekly-note.md on top. Order follows traffic_score, so whatever small-spot
 // boost the nightly rank uses (npm run rank:lab to compare) carries into the email too.
 //   npm run weekly-email -- --dry-run            # write each email to .weekly-email/ (nothing sent)
-//   npm run weekly-email -- --to you@example.com # send only to that subscriber (a test)
+//   npm run weekly-email -- --to you@example.com # a test: that subscriber's email, or a sample
+//                                                  (all of LA, every type) if they haven't signed up
 //   npm run weekly-email                         # send to everyone confirmed (meant for Thursday morning)
 import "./env";
 import fs from "node:fs";
@@ -18,6 +19,8 @@ const dryRun = args.includes("--dry-run");
 const onlyTo = args.includes("--to") ? args[args.indexOf("--to") + 1]?.toLowerCase() : null;
 const PER_DAY = 3;
 const MAX = 15;
+// Anyone sent to in the last 5 days is skipped, so a rerun (or both cron slots) can't double-send.
+const RESEND_GAP = 5 * 864e5;
 
 interface Ev { occurrence_id: string; event_id: string; title: string; venue_id: string; venue_name: string; starts_at: string; category: string | null; price: string | null; url: string | null; traffic_score: number | null; cancelled: boolean; uncertain_fields: string[] | null }
 interface Sub { id: string; email: string; place_label: string; lat: number; lng: number; radius_km: number; types: string[]; token: string }
@@ -75,14 +78,17 @@ ${list.map((e) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.4"><b>
 }
 
 async function main() {
-  let q = supabase.from("email_subscribers").select("id,email,place_label,lat,lng,radius_km,types,token").not("confirmed_at", "is", null).is("unsubscribed_at", null);
+  let q = supabase.from("email_subscribers").select("id,email,place_label,lat,lng,radius_km,types,token,last_sent_at").not("confirmed_at", "is", null).is("unsubscribed_at", null);
   if (onlyTo) q = q.eq("email", onlyTo);
-  const { data: subs, error } = await q;
+  const { data, error } = await q;
   if (error) throw new Error(error.message);
+  let subs = (data as Sub[]).filter((s) => onlyTo || !(s as Sub & { last_sent_at?: string }).last_sent_at || Date.now() - Date.parse((s as Sub & { last_sent_at: string }).last_sent_at) > RESEND_GAP);
+  // A test to someone who hasn't signed up: show them the all-of-LA version (the stop link won't work).
+  if (onlyTo && !subs.length) subs = [{ id: "", email: onlyTo, place_label: "All of LA", lat: 34.0522, lng: -118.2437, radius_km: 80, types: [], token: "sample" }];
   const paragraphs = note();
   console.log(`${subs.length} subscriber(s)${dryRun ? " (dry run)" : ""}; note: ${paragraphs.length ? "yes" : "none"}.`);
   if (dryRun) fs.mkdirSync(".weekly-email", { recursive: true });
-  for (const s of subs as Sub[]) {
+  for (const s of subs) {
     const evs = await pick(s);
     if (!evs.length) { console.log(`  ${s.email}: nothing this week, skipped`); continue; }
     const m = render(s, evs, paragraphs);
@@ -97,7 +103,7 @@ async function main() {
         to: s.email, from: WEEKLY_FROM, subject: m.subject, html: m.html, text: m.text,
         headers: { "List-Unsubscribe": `<${unsubscribeUrl(s.token)}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
       });
-      await supabase.from("email_subscribers").update({ last_sent_at: new Date().toISOString() }).eq("id", s.id);
+      if (s.id) await supabase.from("email_subscribers").update({ last_sent_at: new Date().toISOString() }).eq("id", s.id);
       console.log(`  ${s.email}: sent ${evs.length} events`);
     } catch (e) {
       console.warn(`  ${s.email}: ${(e as Error).message}`);
