@@ -10,7 +10,7 @@ export default function SiteHeader() {
     <header className="sticky top-0 z-30 border-b border-white/10 bg-[#2b2119]/90 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
         <Link href="/" className="flex items-center gap-2">
-          <span className="text-xl">📌</span>
+          <StapleGun />
           <span className="sr-only">Light Pole</span>
           <span className="font-poster text-[26px] uppercase leading-none" aria-hidden>
             <span className="text-[#fff23a]">Ligh<PoleT /></span> <span className="text-[#ff5fae]">Pole</span>
@@ -33,6 +33,23 @@ export default function SiteHeader() {
         </nav>
       </div>
     </header>
+  );
+}
+
+/** Side view of a staple gun firing a staple: how flyers actually go up on a pole. */
+function StapleGun() {
+  return (
+    <svg viewBox="0 0 44 33" className="h-7 w-auto shrink-0" aria-hidden>
+      {/* grip lever, hinged at the front, rear end raised */}
+      <path d="M7 8.6 L38.6 2.2 Q42.4 1.6 42.4 5.2 V7.4 Q42.4 10.2 39.6 10.7 L15 15.4 Q11 16 9.6 13.4 Z" fill="#ff5fae" />
+      {/* front head and magazine */}
+      <path d="M2.5 8.5 Q2.5 7 4 7 H13 Q14.5 7 14.5 8.5 V17 H40 Q42 17 42 19 V22.5 Q42 24.5 40 24.5 H2.5 Z" fill="#d9dde1" />
+      <rect x="5" y="19" width="34" height="1.3" rx="0.6" fill="#fff" opacity="0.7" />
+      <circle cx="10.5" cy="11" r="1.7" fill="#2b2119" />
+      {/* nose and a staple on its way out */}
+      <rect x="2.5" y="24.5" width="7" height="2" fill="#9aa1a8" />
+      <path d="M3.6 30.2 V27.8 H8.4 V30.2" fill="none" stroke="#fff23a" strokeWidth="1.4" strokeLinejoin="round" />
+    </svg>
   );
 }
 
