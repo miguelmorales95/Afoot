@@ -113,6 +113,18 @@ async function duplicateDates(venueId: string, eventId: string, title: string, s
  * otherwise add the same run again with a new start. Returns the existing run each new one
  * falls inside (by new start time), so the new copy is skipped and the old one's end updated.
  */
+/** Single dates (not runs) that fall inside a run this event already has: the run covers them. */
+async function insideKnownRuns(eventId: string, rows: { starts_at: string; ends_at: string | null }[]) {
+  const singles = rows.filter((r) => !isRun(r));
+  if (!singles.length) return new Set<string>();
+  const { data } = await supabase.from("event_occurrences").select("starts_at, ends_at").eq("event_id", eventId).eq("cancelled", false).not("ends_at", "is", null);
+  const runs = (data ?? []).filter(isRun);
+  return new Set(singles.filter((r) => {
+    const t = Date.parse(r.starts_at);
+    return runs.some((x) => Date.parse(x.starts_at) <= t && t < Date.parse(x.ends_at!));
+  }).map((r) => r.starts_at));
+}
+
 async function overlappingRuns(eventId: string, rows: { starts_at: string; ends_at: string | null }[]) {
   const runs = rows.filter(isRun);
   const hits = new Map<string, { id: string; starts_at: string; ends_at: string }>();
@@ -205,7 +217,9 @@ export async function storeExtractedEvents(opts: {
 
     const dupes = await duplicateDates(opts.venueId, eventRow.id, ev.title, rows.map((r) => r.starts_at));
     const runs = await overlappingRuns(eventRow.id, rows);
-    const filteredRows = rows.filter((r) => !dupes.has(r.starts_at) && !runs.has(r.starts_at));
+    const covered = await insideKnownRuns(eventRow.id, rows);
+    if (covered.size) log(`  ~ "${ev.title}": ${covered.size} date(s) fall inside its listed run; skipped`);
+    const filteredRows = rows.filter((r) => !dupes.has(r.starts_at) && !runs.has(r.starts_at) && !covered.has(r.starts_at));
     if (dupes.size) log(`  ~ "${ev.title}": ${dupes.size} date(s) already listed by a matching event here; skipped`);
     if (runs.size) {
       // Same run read again: keep the original (and its RSVPs/chat), take the page's current end date.

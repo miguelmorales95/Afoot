@@ -1,13 +1,16 @@
 "use client";
 
-import Link from "next/link";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { HOUSE_ADS, campaignsFor, type LiveCampaign } from "@/lib/ads";
 import { useLiveCampaigns, useSeen } from "@/lib/sponsorClient";
 import { WhySponsored } from "./SponsorCard";
+import SourceForm, { SOURCE_TYPES, type SourceType } from "./SourceForm";
 
 // Cards that sit between the event posters, on purpose quieter than them:
 //   - ads are newsprint (off-white, gray ink, "AD" up top), like a classified,
-//   - asks are kraft paper with tear-off tabs, like a "help wanted" flyer on a pole.
+//   - asks are kraft paper with tear-off tickets down the right edge, like a "take one" flyer
+//     (sideways, so it fits the feed). Each ticket opens the source popup with its type picked.
 // Both keep the .flyer staples and tilt so they still belong on the pole.
 
 export type FeedNoteKind = "ad" | "ask-sources" | "ask-curators";
@@ -23,47 +26,80 @@ export function FeedNote({ kind, n, area }: { kind: FeedNoteKind; n: number; are
     <AskCard
       eyebrow="Help us fill the pole"
       title="Know where LA events get posted?"
-      body="A newsletter you get, a venue's calendar page, a site we're missing. Send it over and we'll start pulling events from it."
-      tabs={[
-        { label: "Share a newsletter", href: "/submit?kind=source&type=newsletter" },
-        { label: "Share a website", href: "/submit?kind=source&type=website" },
-      ]}
+      body="An Instagram account, a newsletter you get, a venue's calendar page. Take a ticket and send it over; we'll start pulling events from it."
+      tickets={TICKET_ORDER.map((t) => ({ label: SOURCE_TYPES[t].ticket, emoji: SOURCE_TYPES[t].label.split(" ")[0], type: t }))}
     />
   ) : (
     <AskCard
       eyebrow="Curators wanted"
       title="Post LA events on Instagram?"
       body="Become a Light Pole curator. We add the events you post, credited to your handle and linked back to your page."
-      tabs={[
-        { label: "I'm a curator", href: "/submit?kind=source&type=instagram&mine=1" },
-        { label: "Suggest an account", href: "/submit?kind=source&type=instagram" },
+      tickets={[
+        { label: "I'm a curator", emoji: "🙋", type: "instagram", mine: true },
+        { label: "Suggest one", emoji: "📸", type: "instagram" },
+        { label: "I'm a curator", emoji: "🙋", type: "instagram", mine: true },
+        { label: "Suggest one", emoji: "📸", type: "instagram" },
       ]}
     />
   );
 }
 
-function AskCard({ eyebrow, title, body, tabs }: { eyebrow: string; title: string; body: string; tabs: { label: string; href: string }[] }) {
+/** Tickets down the sources flyer, top to bottom. */
+const TICKET_ORDER: SourceType[] = ["instagram", "newsletter", "website", "instagram", "newsletter", "website"];
+type Ticket = { label: string; emoji: string; type: SourceType; mine?: boolean };
+
+function AskCard({ eyebrow, title, body, tickets }: { eyebrow: string; title: string; body: string; tickets: Ticket[] }) {
+  const [open, setOpen] = useState<Ticket | null>(null);
   return (
-    // Bottom padding clears the next poster's overlap (.flyer-stack), so the tabs stay whole.
-    <div className="flyer px-4 pb-4 pt-6 sm:px-6" style={KRAFT} role="complementary" aria-label={eyebrow}>
-      <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-black/55">{eyebrow}</p>
-      <h3 className="mt-1 text-[20px] font-extrabold leading-tight text-[#2a2016] sm:text-[22px]">{title}</h3>
-      <p className="mt-1 max-w-xl text-[14px] font-medium leading-snug text-black/70">{body}</p>
-      {/* Tear-off tabs: each is a link. */}
-      <div className="-mx-4 mt-4 flex border-t-[1.5px] border-dashed border-black/35 sm:-mx-6">
-        {tabs.map((t, i) => (
-          <Link
-            key={t.href}
-            href={t.href}
-            className={`flex min-h-12 flex-1 items-center justify-center px-2 py-3 text-center text-[13px] font-extrabold text-[#2a2016] hover:bg-black/10 ${
-              i ? "border-l-[1.5px] border-dashed border-black/35" : ""
-            }`}
-          >
-            {t.label} →
-          </Link>
-        ))}
+    <div className="flyer flex pt-6" style={KRAFT} role="complementary" aria-label={eyebrow}>
+      <div className="min-w-0 flex-1 px-4 pb-8 sm:px-6">
+        <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-black/55">{eyebrow}</p>
+        <h3 className="mt-1 text-[20px] font-extrabold leading-tight text-[#2a2016] sm:text-[22px]">{title}</h3>
+        <p className="mt-1 max-w-xl text-[14px] font-medium leading-snug text-black/70">{body}</p>
       </div>
+      {/* Tear-off tickets: a dashed cut line, then one ticket per row, each its own button. */}
+      {/* pb-4 keeps the last ticket clear of the next poster's overlap (.flyer-stack). */}
+      <ul className="-mt-6 flex w-[122px] shrink-0 flex-col border-l-[1.5px] border-dashed border-black/40 pb-4 sm:w-[150px]">
+        {tickets.map((t, i) => (
+          // Wide screens: one set of tickets is plenty (the flyer is short there).
+          <li key={i} className={`flex flex-1 ${i ? "border-t-[1.5px] border-dashed border-black/35" : ""} ${i >= tickets.length / 2 ? "sm:hidden" : ""}`}>
+            <button
+              type="button"
+              onClick={() => setOpen(t)}
+              className="flex min-h-11 flex-1 items-center gap-1.5 px-2.5 text-left text-[13px] font-extrabold leading-tight text-[#2a2016] transition-colors hover:bg-black/10 focus-visible:bg-black/10 focus-visible:outline-none active:bg-black/20"
+            >
+              <span aria-hidden>{t.emoji}</span>
+              <span>{t.label}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      {open && <SourceSheet ticket={open} onClose={() => setOpen(null)} />}
     </div>
+  );
+}
+
+/** The source form in a popup over the feed (no page change, so going back is just closing it). */
+function SourceSheet({ ticket, onClose }: { ticket: Ticket; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = overflow; };
+  }, [onClose]);
+  // Portaled to <body>: the flyer is tilted (a transform), which would trap a fixed overlay inside it.
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center" onClick={onClose}>
+      <div role="dialog" aria-modal="true" aria-label="Share a source" onClick={(e) => e.stopPropagation()}
+        className="max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl border border-white/10 bg-[#2b2119] p-5 pb-8 text-[#f3ece2] sm:rounded-3xl">
+        <div className="flex justify-end">
+          <button type="button" onClick={onClose} aria-label="Close" className="-mr-1 -mt-1 rounded-full px-2 text-2xl leading-none text-white/60 hover:text-white">×</button>
+        </div>
+        <SourceForm initialType={ticket.type} initialMine={!!ticket.mine} onClose={onClose} />
+      </div>
+    </div>,
+    document.body,
   );
 }
 

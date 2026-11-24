@@ -7,7 +7,7 @@ export default function AdRail({ area = null }: { area?: string | null }) {
   if (adProvider() === "none") return null;
   return (
     <aside className="hidden lg:block" aria-label="Advertisements">
-      <div className="sticky top-20 space-y-4">
+      <div className="sticky top-[calc(var(--header-offset,3.5rem)+1.5rem)] space-y-4 transition-[top] duration-200">
         <AdUnit index={0} area={area} className="min-h-[200px]" slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_RAIL} />
         <AdUnit index={1} area={area} className="min-h-[200px]" />
         <p className="px-1 text-[10px] leading-relaxed text-white/20">

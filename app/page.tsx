@@ -540,7 +540,7 @@ export default function Home() {
           const colors = posterColors(items.slice(0, limit).map((it) => (it.kind === "one" ? it.ev : it.evs[0])));
           return (
             <div key={key} id={`day-${key}`} className="mb-8 scroll-mt-14">
-              <div className="sticky top-14 z-10 -mx-4 flex items-center justify-between gap-3 bg-[#2b2119]/95 px-4 py-2 backdrop-blur">
+              <div className="sticky top-[var(--header-offset,3.5rem)] z-10 transition-[top] duration-200 motion-reduce:transition-none -mx-4 flex items-center justify-between gap-3 bg-[#2b2119]/95 px-4 py-2 backdrop-blur">
                 <h2 className="flex min-w-0 items-baseline gap-2">
                   <span className="font-poster truncate text-[28px] uppercase leading-none" style={{ color: PAPER[di % PAPER.length] }}>
                     {formatDayLabel(startedBefore(dayEvents[0]) ? new Date().toISOString() : dayEvents[0].starts_at)}

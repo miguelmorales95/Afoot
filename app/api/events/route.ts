@@ -54,6 +54,9 @@ export async function GET(req: NextRequest) {
 /**
  * One card per run: a multi-day run ("through Dec 24") that starts inside an earlier run of
  * the same event is the same run read again on a later day, so only the earliest is kept.
+ * A single date inside a run of the same event (or a similar title at the same venue) is that
+ * run read as one day ("The Gingerbread Man Hunt", Time TBA, under its own "Until Dec 24" card),
+ * so it goes too.
  */
 function dropRepeatedRuns(occurrences: any[]) {
   const runs = occurrences
@@ -66,6 +69,15 @@ function dropRepeatedRuns(occurrences: any[]) {
     const t = Date.parse(o.starts_at);
     if (prev.some((p) => t < Date.parse(p.ends_at))) drop.add(o.occurrence_id);
     else kept.set(o.event_id, [...prev, o]);
+  }
+  const allRuns = [...kept.values()].flat();
+  for (const o of occurrences) {
+    if (isRun(o) || !allRuns.length) continue;
+    const t = Date.parse(o.starts_at);
+    const inside = allRuns.some((r) =>
+      (r.event_id === o.event_id || (r.venue_id === o.venue_id && similarTitles(r.title, o.title))) &&
+      Date.parse(r.starts_at) <= t && t < Date.parse(r.ends_at));
+    if (inside) drop.add(o.occurrence_id);
   }
   return drop.size ? occurrences.filter((o) => !drop.has(o.occurrence_id)) : occurrences;
 }

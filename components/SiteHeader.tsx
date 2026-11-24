@@ -1,14 +1,50 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useApp } from "./AppProvider";
 import { suggestMailto } from "@/lib/site";
 
+// Scrolled this far down, the header gets out of the way; it comes back only after a real scroll
+// up (someone who wants it), or near the top. Events get the screen: success is people going out.
+const HIDE_AFTER = 80, SHOW_AFTER_UP = 250;
+
+/** Hides on scroll down, returns on a deliberate scroll up. Sets --header-offset for sticky bars. */
+function useAutoHide() {
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => {
+    let last = window.scrollY, up = 0, ticking = false;
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        ticking = false;
+        const y = window.scrollY, dy = y - last;
+        last = y;
+        if (y < HIDE_AFTER) { up = 0; setHidden(false); return; }
+        if (dy > 0) { up = 0; setHidden(true); }
+        else if (dy < 0 && (up -= dy) > SHOW_AFTER_UP) setHidden(false);
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+  const ref = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const h = ref.current?.offsetHeight;
+    document.documentElement.style.setProperty("--header-offset", hidden ? "0px" : h ? `${h}px` : "3.5rem");
+  }, [hidden]);
+  return { hidden, ref };
+}
+
 export default function SiteHeader() {
+  const { hidden, ref } = useAutoHide();
   return (
-    <header className="sticky top-0 z-30 border-b border-white/10 bg-[#2b2119]/90 backdrop-blur">
+    <header
+      ref={ref}
+      className={`sticky top-0 z-30 border-b border-white/10 bg-[#2b2119]/90 backdrop-blur transition-transform duration-200 motion-reduce:transition-none ${hidden ? "-translate-y-full" : ""}`}
+    >
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
         <Link href="/" className="flex items-center gap-2">
           <StapleGun />
