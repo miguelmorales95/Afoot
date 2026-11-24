@@ -5,7 +5,8 @@
 //   2. parse: Claude (Haiku) reads the cards into events; each is checked against what's already
 //      on the pole (same day, similar title) and marked new / already / skipped.
 //   3. add: the new ones are stored like links people send (source "link"), each at its venue
-//      (found or created by name, geocoded from the address). Voice lines and rank come nightly.
+//      (found or created by name, geocoded from the address), then ranked and given their voice
+//      line right away (finishNow), so a morning paste is ranked that morning.
 // No quality filter yet: somedudes are trusted, so what they paste goes on. Add one before anyone
 // untrusted gets this page.
 import type { NextRequest } from "next/server";
@@ -14,6 +15,7 @@ import { completeJson, jsonObject } from "./llm";
 import { similarTitles } from "./dedupe";
 import { dayKey } from "./format";
 import { todayISODate } from "./ingest";
+import { voiceSource, writeVoiceLines, type VoiceInput } from "./voice";
 import type { EventCategory, ExtractedEvent } from "./types";
 
 export interface Somedude { email: string; area: string }
@@ -146,6 +148,7 @@ export async function addPasted(evs: PastedEvent[]): Promise<{ title: string; ok
   const { geocode } = await import("./geocode");
   const { storeExtractedEvents } = await import("./ingest");
   const results: { title: string; ok: boolean; note: string }[] = [];
+  const stored: { id: string; input: VoiceInput }[] = [];
   for (const e of evs) {
     try {
       if (await alreadyOnPole(e)) { results.push({ title: e.title, ok: false, note: "already on the pole" }); continue; }
@@ -155,16 +158,40 @@ export async function addPasted(evs: PastedEvent[]): Promise<{ title: string; ok
       // Locate it first, so an address-only listing lands on the venue we already have there (~60 m).
       const geo = e.address ? await geocode(e.address).catch(() => null) : null;
       const venueId = await venueFor({ name, address, lat: geo?.lat ?? null, lng: geo?.lng ?? null, source: "link" });
+      // The venue's own name (an address can land on a venue we already had), as the nightly run sees it.
+      const { data: v } = await supabase.from("venues").select("name").eq("id", venueId).maybeSingle();
+      const venueName = (v?.name as string | undefined) ?? name;
       const ev: ExtractedEvent = {
         title: e.title, description: e.description || null, category: e.category, price: null, url: e.url || null,
         recurrence_description: null, is_recurring: false, tags: [], time_unknown: e.time_unknown,
         occurrences: [{ start: e.start, end: null }],
       } as ExtractedEvent;
-      const n = await storeExtractedEvents({ venueId, events: [ev], source: "link", fallbackUrl: e.url || null });
-      results.push({ title: e.title, ok: n > 0, note: n > 0 ? `added at ${name}` : "matched an event already at that venue" });
+      const n = await storeExtractedEvents({
+        venueId, events: [ev], source: "link", fallbackUrl: e.url || null,
+        onStored: (id) => stored.push({ id, input: { title: e.title, venue: venueName, category: e.category, description: e.description || "", tagline: null } }),
+      });
+      results.push({ title: e.title, ok: n > 0, note: n > 0 ? `added at ${venueName}` : "matched an event already at that venue" });
     } catch (err) {
       results.push({ title: e.title, ok: false, note: (err as Error).message });
     }
   }
+  await finishNow(stored);
   return results;
+}
+
+/**
+ * What the nightly run would do for these events, done now so they don't wait a day: the traffic
+ * score (same formula, small-spot boost included) and the card line in Miguel's voice. Neither is
+ * required to show the event: a failure here leaves it for the nightly run.
+ */
+async function finishNow(stored: { id: string; input: VoiceInput }[]) {
+  if (!stored.length) return;
+  const { rankEvents } = await import("./rankRun");
+  const quiet = () => {};
+  await Promise.all([
+    rankEvents({ eventIds: stored.map((s) => s.id), log: quiet }).catch(() => null),
+    writeVoiceLines(stored.map((s) => s.input)).then((lines) => Promise.all(lines.map((line, i) => line
+      ? supabase.from("events").update({ voice_line: line, voice_line_src: voiceSource(stored[i].input) }).eq("id", stored[i].id)
+      : null))).catch(() => null),
+  ]);
 }

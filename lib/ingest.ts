@@ -151,6 +151,8 @@ export async function storeExtractedEvents(opts: {
   source: "website" | "newsletter" | "manual" | "link" | "eventbrite" | "ticketmaster" | "feed";
   fallbackUrl?: string | null;
   log?: (s: string) => void;
+  /** Called with each stored event's id (the somedude desk ranks them right away). */
+  onStored?: (eventId: string) => void;
 }): Promise<number> {
   const log = opts.log ?? (() => {});
   let occurrenceCount = 0;
@@ -245,7 +247,7 @@ export async function storeExtractedEvents(opts: {
         .from("event_occurrences")
         .upsert(filteredRows, { onConflict: "event_id,starts_at" });
       if (occErr) log(`  ! occurrences for "${ev.title}": ${occErr.message}`);
-      else occurrenceCount += filteredRows.length;
+      else { occurrenceCount += filteredRows.length; opts.onStored?.(eventRow.id); }
     }
   }
 

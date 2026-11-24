@@ -208,7 +208,7 @@ export default function SomedudePage() {
           {phase === "adding" && <p className="mt-3 font-bold text-[#86f45c]">Adding… {Math.round(progress * 100)}%</p>}
           {phase === "done" && (
             <p className="mt-3 rounded bg-[#86f45c]/15 px-3 py-2 text-sm text-[#d9ffc9]">
-              Added {results.filter((r) => r.ok).length} event{results.filter((r) => r.ok).length === 1 ? "" : "s"}. They show on the pole now; voice lines and ranking catch up tonight.
+              Added {results.filter((r) => r.ok).length} event{results.filter((r) => r.ok).length === 1 ? "" : "s"}. They're on the pole now, ranked and with their voice lines.
               {results.some((r) => !r.ok) && ` ${results.filter((r) => !r.ok).length} didn't go in (listed below).`}
             </p>
           )}
