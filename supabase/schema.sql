@@ -955,3 +955,5 @@ grant all on afoot.email_subscribers to service_role;
 -- Card line in Miguel's voice (migrations/20261126000000_voice_line.sql; nearby_events returns it).
 alter table afoot.events add column if not exists voice_line text;
 alter table afoot.events add column if not exists voice_line_src text;
+
+-- Somedudes (/somedude paste importer) and their import log: migrations/20261127000000_somedudes.sql.

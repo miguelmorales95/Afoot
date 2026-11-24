@@ -582,6 +582,13 @@ tapped. Subscribers live in `afoot.email_subscribers` (migration `20261125000000
   (a sample for all of LA if that address hasn't signed up).
 - `npm run weekly-email` sends to everyone confirmed. Picks are the next 7 days by `traffic_score`, one card
   per venue, 3 per day, 15 max. Needs `RESEND_API_KEY` (and `WEEKLY_EMAIL_FROM` if not miguel@somedude.app).
+- Somedude desk (`/somedude`): the trusted local running a city pastes an events page (Facebook Events
+  tab: Ctrl+A, Ctrl+C; or drops a saved .html) and the new events go straight on the pole. The browser
+  cuts the page into cards (`lib/pageCards.ts`), Claude (Haiku) reads them, each is checked against
+  what's already listed (same day, similar title), and the new ones are stored as `source = "link"`
+  (`lib/somedude.ts`). Access: rows in `afoot.somedudes` (email, area), added by hand, never from the
+  site. Every run is logged in `afoot.paste_imports`. No quality filter yet: add one before anyone
+  untrusted gets access.
 - Card lines: each card's one line is written in Miguel's voice by Claude (Sonnet) from the listing,
   facts only (`lib/voice.ts`, picked as "Way 2: rewrite" in `npm run voice:lab`). `npm run voice-lines`
   fills in new or changed events (nightly, after the rank); `-- --all` rewrites every line after you edit
