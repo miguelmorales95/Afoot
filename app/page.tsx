@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import type { NearbyEvent } from "@/lib/types";
 import {
@@ -15,13 +15,15 @@ import {
   formatTime,
 } from "@/lib/format";
 import AdRail from "@/components/AdRail";
-import AdUnit from "@/components/AdUnit";
 import GoingButton from "@/components/GoingButton";
 import EventFeedback, { UnconfirmedBadges } from "@/components/EventFeedback";
 import VenueMiniMap from "@/components/VenueMiniMap";
 import VenueMapModal from "@/components/VenueMapModal";
 import DateRangePicker from "@/components/DateRangePicker";
-import { LAUNCH_AREAS, type LaunchArea } from "@/lib/areas";
+import PlaceSearch, { type PlacePick } from "@/components/PlaceSearch";
+import { FEED_NOTES, FeedNote } from "@/components/FeedNotes";
+import { NEWSLETTER_EVENT } from "@/components/SiteHeader";
+import WeeklyEmailSheet from "@/components/WeeklyEmailSheet";
 import { areaForLocation, campaignsFor, type LiveCampaign } from "@/lib/ads";
 import { useLiveCampaigns, useSeen } from "@/lib/sponsorClient";
 import { countClick, observeEventView } from "@/lib/eventStatsClient";
@@ -47,7 +49,14 @@ interface Loc {
 const ALL_LA: Loc = { lat: 34.05, lng: -118.25, label: "All of LA", all: true };
 
 const STORAGE_KEY = "afoot_loc";
+const LAYOUT_KEY = "afoot_layout";
 const PAGE = 15;
+// A note (ad or ask) goes before card NOTE_FIRST of each day (0-based), then every NOTE_EVERY cards.
+const NOTE_FIRST = 5;
+const NOTE_EVERY = 12;
+// Days of the list drawn at first, and how many more each time the reader scrolls near the end.
+const DAYS_FIRST = 3;
+const DAYS_MORE = 4;
 
 // Nothing picked means everything. "Games" covers game nights and trivia (each was too thin alone).
 const FILTERS: { key: string; label: string }[] = [
@@ -66,9 +75,11 @@ export default function Home() {
   const [loc, setLoc] = useState<Loc | null>(null);
   const [events, setEvents] = useState<NearbyEvent[]>([]);
   const [feedback, setFeedback] = useState(false); // flags/checks need the database
-  const [query, setQuery] = useState("");
-  // Event types shown; empty means everything.
+  // Event types shown; empty means everything. The chips follow `types` right away; the feed
+  // follows the deferred copy, so a tap lights or clears its chip before the list re-renders.
   const [types, setTypes] = useState<Set<string>>(new Set());
+  const shownTypes = useDeferredValue(types);
+  const filtering = shownTypes !== types;
   const [view, setView] = useState<View>("list");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,6 +87,31 @@ export default function Home() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [mapRange, setMapRange] = useState<{ start: string; end: string } | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // The weekly-email sheet: opened by the envelope in the site header (or /?newsletter=1 from
+  // other pages); the confirm / unsubscribe links come back with ?newsletter=confirmed|stopped|expired.
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [emailNote, setEmailNote] = useState<string | null>(null);
+  useEffect(() => {
+    const open = () => setEmailOpen(true);
+    window.addEventListener(NEWSLETTER_EVENT, open);
+    const q = new URLSearchParams(window.location.search).get("newsletter");
+    if (q === "1") setEmailOpen(true);
+    else if (q) setEmailNote(
+      q === "confirmed" ? "You're on the list. The first email comes Thursday morning."
+      : q === "stopped" ? "Done. No more weekly emails."
+      : "That link didn't work. Try signing up again from the ✉ button.",
+    );
+    if (q) window.history.replaceState(null, "", window.location.pathname);
+    return () => window.removeEventListener(NEWSLETTER_EVENT, open);
+  }, []);
+  // Big posters (default) or the compact layout; remembered on this device.
+  const [compact, setCompact] = useState(false);
+  useEffect(() => { try { setCompact(localStorage.getItem(LAYOUT_KEY) === "compact"); } catch { /* ignore */ } }, []);
+  const toggleLayout = () =>
+    setCompact((c) => {
+      try { localStorage.setItem(LAYOUT_KEY, c ? "posters" : "compact"); } catch { /* ignore */ }
+      return !c;
+    });
   const controlsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -131,29 +167,28 @@ export default function Home() {
     }
   }, []);
 
-  const search = async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    if (!query.trim()) return;
+  const goTo = async (pick: PlacePick) => {
+    if (pick.kind === "all") { persist(ALL_LA); void loadEvents(ALL_LA); return; }
+    if (pick.kind === "place") {
+      const l: Loc = { lat: pick.place.lat, lng: pick.place.lng, label: pick.place.name };
+      persist(l);
+      void loadEvents(l);
+      return;
+    }
+    // A ZIP, or a place not in the suggestions: geocode it.
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/geocode?q=${encodeURIComponent(query)}`);
+      const res = await fetch(`/api/geocode?q=${encodeURIComponent(pick.text)}`);
       const data = await res.json();
-      if (!res.ok) throw new Error("Couldn't find that place — try a neighborhood or ZIP.");
-      const l: Loc = { lat: data.lat, lng: data.lng, label: shortLabel(data.label, query) };
+      if (!res.ok) throw new Error("Couldn't find that place. Try a city, neighborhood, or ZIP.");
+      const l: Loc = { lat: data.lat, lng: data.lng, label: /^\d{5}$/.test(pick.text) ? pick.text : shortLabel(data.label, pick.text) };
       persist(l);
       await loadEvents(l);
     } catch (e) {
       setError((e as Error).message);
       setLoading(false);
     }
-  };
-
-  const pickArea = (a: LaunchArea) => {
-    const l: Loc = { lat: a.lat, lng: a.lng, label: a.name };
-    setQuery("");
-    persist(l);
-    void loadEvents(l);
   };
 
   const useMyLocation = () => {
@@ -182,8 +217,8 @@ export default function Home() {
   };
 
   const visible = useMemo(
-    () => (types.size === 0 ? events : events.filter((e) => types.has(filterKey(e.category)))),
-    [events, types],
+    () => (shownTypes.size === 0 ? events : events.filter((e) => shownTypes.has(filterKey(e.category)))),
+    [events, shownTypes],
   );
 
   // The launch area being browsed (chip, or a search/location near one): picks the area
@@ -244,14 +279,43 @@ export default function Home() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => { window.removeEventListener("scroll", onScroll); if (frame) cancelAnimationFrame(frame); };
   }, [view, grouped]);
-  const toggleLineup = (id: string) =>
+  // Each day's cards (lineups grouped), kept stable so the memoized cards skip re-rendering.
+  const dayItems = useMemo(() => new Map(grouped.map(([k, evs]) => [k, lineupItems(evs)])), [grouped]);
+  // Ads and asks between the posters: one after the 5th card of each day, then every 12 cards,
+  // cycling through FEED_NOTES down the whole feed.
+  const noteStarts = useMemo(() => {
+    const out: Record<string, number> = {};
+    let n = 0;
+    for (const [k] of grouped) { out[k] = n; n += Math.ceil(Math.max(0, (dayItems.get(k)?.length ?? 0) - NOTE_FIRST) / NOTE_EVERY); }
+    return out;
+  }, [grouped, dayItems]);
+  const toggleLineup = useCallback((id: string) =>
     setOpenLineups((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
-    });
-  useEffect(() => setShown({}), [events, types]);
+    }), []);
+  // Days drawn so far: a few at first, more as the reader nears the end (all 45 days at once
+  // was ~700 posters, which made every filter tap slow).
+  // Reset during render (not in an effect), so a new list never first draws with the old,
+  // longer limit: a filtered list is short, so the limit grows fast while a filter is on.
+  const [dayLimit, setDayLimit] = useState(DAYS_FIRST);
+  const [feedOf, setFeedOf] = useState({ events, shownTypes });
+  if (feedOf.events !== events || feedOf.shownTypes !== shownTypes) {
+    setFeedOf({ events, shownTypes });
+    setShown({});
+    setDayLimit(DAYS_FIRST);
+  }
+  const moreDaysRef = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => entries.some((e) => e.isIntersecting) && setDayLimit((d) => d + DAYS_MORE),
+      { rootMargin: "1500px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
   const scrollToControls = () =>
     requestAnimationFrame(() => controlsRef.current?.scrollIntoView({ block: "start" }));
@@ -297,49 +361,7 @@ export default function Home() {
     setMapRange({ start, end: shiftDay(start, rangeLen - 1) });
   };
 
-  const searchForm = (
-    <form onSubmit={search} className="relative mx-auto w-full max-w-lg">
-      <input
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Neighborhood, city, or ZIP"
-        aria-label="Neighborhood, city, or ZIP"
-        className="w-full rounded-full border border-white/10 bg-white/5 py-3 pl-5 pr-24 text-sm outline-none placeholder:text-white/30 focus:border-[#ffe45c]/60"
-      />
-      <button
-        type="submit"
-        className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full bg-[#ffe45c] px-4 py-2 text-sm font-semibold text-[#1a1a1a] hover:bg-[#fff08a]"
-      >
-        Search
-      </button>
-    </form>
-  );
-
-  const areaChips = (
-    <div className="flex flex-wrap justify-center gap-1.5" aria-label="Neighborhoods">
-      <button
-        type="button"
-        onClick={() => { setQuery(""); persist(ALL_LA); void loadEvents(ALL_LA); }}
-        className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-          loc?.all ? "bg-[#ffe45c] text-[#1a1a1a]" : "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
-        }`}
-      >
-        All of LA
-      </button>
-      {LAUNCH_AREAS.map((a) => (
-        <button
-          key={a.name}
-          type="button"
-          onClick={() => pickArea(a)}
-          className={`rounded-full px-3 py-1 text-xs transition ${
-            loc?.label === a.name ? "bg-[#ffe45c] text-[#1a1a1a]" : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
-          }`}
-        >
-          {a.name}
-        </button>
-      ))}
-    </div>
-  );
+  const searchForm = <PlaceSearch onPick={(p) => void goTo(p)} current={loc && !loc.all ? placeName(loc) : undefined} />;
 
   const typeChips = (fromSheet: boolean) => (
     <div className={`flex flex-wrap gap-1.5 ${fromSheet ? "justify-center" : ""}`} aria-label="Event types">
@@ -378,7 +400,6 @@ export default function Home() {
             >
               or use my current location
             </button>
-            <div className="mx-auto mt-4 max-w-2xl">{areaChips}</div>
             {loc && (
               <button
                 onClick={() => setHeroOpen(false)}
@@ -426,6 +447,13 @@ export default function Home() {
           </div>
           {typeChips(false)}
         </div>
+      )}
+
+      {emailNote && (
+        <p className="mb-4 flex items-start justify-between gap-3 rounded-xl border border-[#ffe45c]/30 bg-[#ffe45c]/10 px-4 py-3 text-sm text-[#fff3a6]">
+          {emailNote}
+          <button onClick={() => setEmailNote(null)} aria-label="Dismiss" className="text-[#fff3a6]/70 hover:text-[#fff3a6]">✕</button>
+        </p>
       )}
 
       {error && (
@@ -496,7 +524,7 @@ export default function Home() {
             {(() => {
               const colors = posterColors(featured.map((f) => f.ev));
               return featured.map(({ ev, campaign }, i) => (
-                <EventCard key={ev.occurrence_id} ev={ev} feedback={feedback} featured={campaign} paper={colors[i]} wide={!!loc?.all} />
+                <EventCard key={ev.occurrence_id} ev={ev} feedback={feedback} featured={campaign} paper={colors[i]} wide={!!loc?.all} compact={compact} />
               ));
             })()}
           </div>
@@ -505,8 +533,8 @@ export default function Home() {
 
       {!loading &&
         view === "list" &&
-        grouped.map(([key, dayEvents], di) => {
-          const items = lineupItems(dayEvents);
+        grouped.slice(0, dayLimit).map(([key, dayEvents], di) => {
+          const items = dayItems.get(key) ?? [];
           const limit = shown[key] ?? PAGE;
           const hidden = items.length - limit;
           const colors = posterColors(items.slice(0, limit).map((it) => (it.kind === "one" ? it.ev : it.evs[0])));
@@ -522,6 +550,23 @@ export default function Home() {
                 {/* One filter + map pair on the page: on the day header pinned at the top. */}
                 {key === currentDay && (
                 <div className="flex shrink-0 items-center gap-1.5">
+                  <button
+                    onClick={toggleLayout}
+                    aria-pressed={compact}
+                    aria-label={compact ? "Show big posters" : "Show compact list"}
+                    title={compact ? "Big posters" : "Compact"}
+                    className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
+                  >
+                    {compact ? (
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden>
+                        <rect x="4" y="3" width="16" height="8" rx="1" /><rect x="4" y="13" width="16" height="8" rx="1" />
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden>
+                        <rect x="4" y="3" width="16" height="4" rx="1" /><rect x="4" y="10" width="16" height="4" rx="1" /><rect x="4" y="17" width="16" height="4" rx="1" />
+                      </svg>
+                    )}
+                  </button>
                   <button
                     onClick={() => setSheetOpen(true)}
                     aria-label="Change place or event type"
@@ -545,17 +590,22 @@ export default function Home() {
                 </div>
                 )}
               </div>
-              <div className="flyer-stack mt-2">
+              <div className={`flyer-stack mt-2 transition-opacity ${filtering ? "opacity-60" : ""}`}>
                 {items.slice(0, limit).flatMap((it, i) => {
-                  if (it.kind === "one") return [<EventCard key={it.ev.occurrence_id} ev={it.ev} feedback={feedback} paper={colors[i]} wide={!!loc?.all} />];
+                  const slot = i - NOTE_FIRST;
+                  const note = slot >= 0 && slot % NOTE_EVERY === 0
+                    ? (() => { const n = noteStarts[key] + slot / NOTE_EVERY; return [<FeedNote key={`note-${key}-${i}`} kind={FEED_NOTES[n % FEED_NOTES.length]} n={Math.floor(n / FEED_NOTES.length)} area={area} />]; })()
+                    : [];
+                  if (it.kind === "one") return [...note, <EventCard key={it.ev.occurrence_id} ev={it.ev} feedback={feedback} paper={colors[i]} wide={!!loc?.all} compact={compact} />];
                   const id = `${key}|${it.key}`;
                   const open = openLineups.has(id);
                   return [
-                    <LineupCard key={id} evs={it.evs} paper={colors[i]} wide={!!loc?.all} open={open} onToggle={() => toggleLineup(id)} />,
+                    ...note,
+                    <LineupCard key={id} id={id} evs={it.evs} paper={colors[i]} wide={!!loc?.all} open={open} onToggle={toggleLineup} compact={compact} />,
                     ...(open
                       // Same paper as the lineup card, so the opened shows read as one stack.
                       ? it.evs.map((ev) => (
-                          <EventCard key={ev.occurrence_id} ev={ev} feedback={feedback} paper={colors[i]} wide={!!loc?.all} inLineup />
+                          <EventCard key={ev.occurrence_id} ev={ev} feedback={feedback} paper={colors[i]} wide={!!loc?.all} inLineup compact={compact} />
                         ))
                       : []),
                   ];
@@ -574,6 +624,11 @@ export default function Home() {
           );
         })}
 
+      {!loading && view === "list" && dayLimit < grouped.length && (
+        // Re-keyed per step so the observer fires again once more days are drawn.
+        <div key={dayLimit} ref={moreDaysRef} className="h-px" aria-hidden />
+      )}
+
       {!loading && view === "list" && grouped.length > 0 && (
         <p className="-mt-4 mb-6 text-[11px] text-white/30">
           Street maps ©{" "}
@@ -587,16 +642,20 @@ export default function Home() {
         </p>
       )}
 
-          {/* One unobtrusive house ad for mobile (rail is hidden there) */}
-          {loc && visible.length > 0 && (
-            <div className="mt-6 lg:hidden">
-              <AdUnit index={0} area={area} className="min-h-[140px]" />
-            </div>
-          )}
         </div>
 
         <AdRail area={area} />
       </div>
+
+      {emailOpen && (
+        <WeeklyEmailSheet
+          loc={loc ?? ALL_LA}
+          placeName={placeName(loc ?? ALL_LA)}
+          types={[...types]}
+          onClose={() => setEmailOpen(false)}
+          onChangeFilters={() => { setEmailOpen(false); setSheetOpen(true); }}
+        />
+      )}
 
       {sheetOpen && loc && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center" onClick={() => setSheetOpen(false)}>
@@ -619,7 +678,6 @@ export default function Home() {
                 or use my current location
               </button>
             </div>
-            {areaChips}
             <h2 className="text-sm font-semibold uppercase tracking-wider text-white/50">What</h2>
             {typeChips(true)}
             <button
@@ -640,7 +698,7 @@ const timeTba = (ev: NearbyEvent) => !!ev.uncertain_fields?.includes("starts_at"
 
 /** Started on an earlier day and still running (shown under today, with its end date). */
 function startedBefore(ev: NearbyEvent) {
-  return dayKey(ev.starts_at) < dayKey(new Date().toISOString());
+  return dayKey(ev.starts_at) < todayKey();
 }
 
 /** The day an event is listed under (a run that started earlier sits under today). */
@@ -648,7 +706,13 @@ function eventDay(ev: NearbyEvent) {
   return dayKey(startedBefore(ev) ? new Date().toISOString() : ev.starts_at);
 }
 
-const todayKey = () => dayKey(new Date().toISOString());
+// Today's key, worked out at most once a minute (it's checked for every event).
+let today = { at: 0, key: "" };
+function todayKey() {
+  const now = Date.now();
+  if (now - today.at > 60_000) today = { at: now, key: dayKey(new Date(now).toISOString()) };
+  return today.key;
+}
 // Noon in LA for a YYYY-MM-DD key, so formatting never slips a day.
 const dayIso = (key: string) => `${key}T20:00:00Z`;
 function shiftDay(key: string, n: number) {
@@ -685,7 +749,10 @@ function posterColors(evs: NearbyEvent[]): string[] {
 }
 
 /** `wide`: browsing all of LA, where distance from downtown means nothing, so it's left off. */
-function EventCard({ ev, feedback, featured, paper, wide, inLineup }: { ev: NearbyEvent; feedback: boolean; featured?: LiveCampaign; paper?: string; wide?: boolean; inLineup?: boolean }) {
+// Memoized: a filter tap re-renders the page, and the cards whose props didn't change skip it.
+/** `compact`: the tighter layout. Same poster and bold type, minus the type badge, map, gist,
+ *  description and tags (parking stays). */
+const EventCard = memo(function EventCard({ ev, feedback, featured, paper, wide, inLineup, compact }: { ev: NearbyEvent; feedback: boolean; featured?: LiveCampaign; paper?: string; wide?: boolean; inLineup?: boolean; compact?: boolean }) {
   const cat = categoryMeta(ev.category);
   const seenRef = useSeen(featured?.id ?? null);
   // Views and taps feed the traffic ranking (counts only).
@@ -706,8 +773,8 @@ function EventCard({ ev, feedback, featured, paper, wide, inLineup }: { ev: Near
     ...(ev.price ? [`${ev.price_is_usual ? "usually " : ""}${ev.price}`] : []),
   ].join(" · ");
   const body = (
-    <div ref={cardRef} className="flyer flex gap-3 px-4 pb-6 pt-6 sm:gap-4" style={look}>
-      <div className="flex w-[104px] shrink-0 flex-col gap-2 sm:w-32">
+    <div ref={cardRef} className={`flyer flex gap-3 px-4 sm:gap-4 ${compact ? "pb-4 pt-5" : "pb-6 pt-6"}`} style={look}>
+      <div className={`flex shrink-0 flex-col gap-2 ${compact ? "w-[100px] sm:w-28" : "w-[104px] sm:w-32"}`}>
         {/* Inked block with the poster's color knocked out, like a letterpress date line. */}
         <time
           dateTime={ev.starts_at}
@@ -730,7 +797,7 @@ function EventCard({ ev, feedback, featured, paper, wide, inLineup }: { ev: Near
           <p className="text-center text-[13px] font-extrabold uppercase leading-tight tracking-wide text-[#111]">{schedule}</p>
         )}
         {/* Under a lineup card the venue, map and type are already shown once above. */}
-        {!inLineup && (
+        {!inLineup && !compact && (
           <button
             type="button"
             aria-label={`Bigger map of ${ev.venue_name}`}
@@ -743,12 +810,12 @@ function EventCard({ ev, feedback, featured, paper, wide, inLineup }: { ev: Near
         {mapOpen && <VenueMapModal ev={ev} onClose={closeMap} />}
       </div>
       <div className="min-w-0 flex-1">
-        {!inLineup && (
+        {!inLineup && !compact && (
           <span className="inline-block rounded-full border-2 border-[#111] px-2 py-0.5 text-[11px] font-extrabold uppercase tracking-wide text-[#111]">
             {cat.emoji} {cat.label}
           </span>
         )}
-        <h3 className={`font-poster mt-1.5 text-[26px] leading-[1.03] text-[#111] sm:text-[30px] ${ev.cancelled ? "line-through opacity-60" : ""}`}>
+        <h3 className={`font-poster leading-[1.03] text-[#111] ${compact ? "text-[24px] sm:text-[27px]" : "mt-1.5 text-[26px] sm:text-[30px]"} ${ev.cancelled ? "line-through opacity-60" : ""}`}>
           {ev.title}
         </h3>
         {featured && (
@@ -769,23 +836,15 @@ function EventCard({ ev, feedback, featured, paper, wide, inLineup }: { ev: Near
         {(ev.cancelled || !!ev.uncertain_fields?.length) && (
           <div className="mt-1.5 flex flex-wrap gap-1"><UnconfirmedBadges ev={ev} /></div>
         )}
-        {ev.description && (
+        {ev.description && !compact && (
           <div className="hidden sm:block">
             <p className="mt-1.5 line-clamp-2 text-[15px] font-medium leading-snug text-black/85">{ev.description}</p>
           </div>
         )}
-        {/* Phones: keywords pulled from the listing, set like a poster's small print. */}
-        {keywords.length > 0 && (
-          <p className="mt-1.5 flex flex-wrap gap-x-1.5 gap-y-0.5 text-[13px] font-extrabold uppercase leading-snug tracking-[0.08em] text-black/85 sm:hidden">
-            {keywords.map((w, i) => (
-              <span key={w}>
-                {w}
-                {i < keywords.length - 1 && <span aria-hidden className="ml-1.5 opacity-40">·</span>}
-              </span>
-            ))}
-          </p>
-        )}
-        {(!!ev.tags?.length || parking) && (
+        {/* Phones: keywords pulled from the listing, set like a poster's small print, and labeled
+            as what they are: an auto-pulled gist, not a write-up. */}
+        {keywords.length > 0 && !compact && <GistLine words={keywords} />}
+        {((!!ev.tags?.length && !compact) || parking) && (
           <div className="mt-2 flex flex-wrap gap-1">
             {/* Only when we know; otherwise assume street parking. */}
             {parking && (
@@ -798,7 +857,7 @@ function EventCard({ ev, feedback, featured, paper, wide, inLineup }: { ev: Near
                 {parking === "parking" ? "🅿️ Parking" : "No Parking"}
               </span>
             )}
-            {(ev.tags ?? []).slice(0, 4).map((t) => (
+            {(compact ? [] : ev.tags ?? []).slice(0, 4).map((t) => (
               <span key={t} className="rounded-full border-[1.5px] border-[#111]/70 px-2 py-0.5 text-xs font-bold text-[#111]">
                 {formatTag(t)}
               </span>
@@ -826,6 +885,37 @@ function EventCard({ ev, feedback, featured, paper, wide, inLineup }: { ev: Near
   ) : (
     body
   );
+});
+
+/** The auto-pulled keywords, with a "GIST" stamp that says, when tapped, where they came from. */
+function GistLine({ words }: { words: string[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-1.5 sm:hidden">
+      <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[13px] font-extrabold uppercase leading-snug tracking-[0.08em] text-black/85">
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-label="What are these words?"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen((o) => !o); }}
+          className="rounded-[3px] border-[1.5px] border-black/60 px-1 text-[10px] leading-[14px] tracking-[0.12em] text-black/70"
+        >
+          Gist
+        </button>
+        {words.map((w, i) => (
+          <span key={w}>
+            {w}
+            {i < words.length - 1 && <span aria-hidden className="ml-1.5 opacity-40">·</span>}
+          </span>
+        ))}
+      </p>
+      {open && (
+        <p className="mt-1 text-[12px] font-semibold normal-case leading-snug tracking-normal text-black/70">
+          Words a robot pulled from the event&apos;s listing. It&apos;s the gist, not a review: Light Pole is one dude covering all of LA.
+        </p>
+      )}
+    </div>
+  );
 }
 
 type DayItem = { kind: "one"; ev: NearbyEvent } | { kind: "lineup"; key: string; evs: NearbyEvent[] };
@@ -852,7 +942,7 @@ function lineupItems(evs: NearbyEvent[]): DayItem[] {
 }
 
 /** Several shows at one venue that day, set like a club's flyer: venue on top, then the lineup. */
-function LineupCard({ evs, paper, wide, open, onToggle }: { evs: NearbyEvent[]; paper?: string; wide?: boolean; open: boolean; onToggle: () => void }) {
+const LineupCard = memo(function LineupCard({ id, evs, paper, wide, open, onToggle, compact }: { id: string; evs: NearbyEvent[]; paper?: string; wide?: boolean; open: boolean; onToggle: (id: string) => void; compact?: boolean }) {
   const first = evs[0];
   const cat = categoryMeta(first.category);
   const parking = parkingStatus(first);
@@ -860,27 +950,31 @@ function LineupCard({ evs, paper, wide, open, onToggle }: { evs: NearbyEvent[]; 
   const closeMap = useCallback(() => setMapOpen(false), []);
   const SHOWN = 6;
   return (
-    <div className="flyer flex gap-3 px-4 pb-6 pt-6 sm:gap-4" style={flyerLook(first.venue_id, paper)}>
-      <div className="flex w-[104px] shrink-0 flex-col gap-2 sm:w-32">
+    <div className={`flyer flex gap-3 px-4 sm:gap-4 ${compact ? "pb-4 pt-5" : "pb-6 pt-6"}`} style={flyerLook(first.venue_id, paper)}>
+      <div className={`flex shrink-0 flex-col gap-2 ${compact ? "w-[100px] sm:w-28" : "w-[104px] sm:w-32"}`}>
         <div className="font-poster rounded-sm bg-[#111] px-1 py-1.5 text-center leading-none" style={{ color: "var(--paper)" }}>
           <span className="block text-[23px] uppercase">{evs.length} shows</span>
           {!timeTba(first) && <span className="mt-1 block text-[13px]">from {formatTime(first.starts_at)}</span>}
         </div>
-        <button
-          type="button"
-          aria-label={`Bigger map of ${first.venue_name}`}
-          onClick={() => setMapOpen(true)}
-          className="block w-full cursor-zoom-in"
-        >
-          <VenueMiniMap lat={first.venue_lat} lng={first.venue_lng} venue={first.venue_name} />
-        </button>
+        {!compact && (
+          <button
+            type="button"
+            aria-label={`Bigger map of ${first.venue_name}`}
+            onClick={() => setMapOpen(true)}
+            className="block w-full cursor-zoom-in"
+          >
+            <VenueMiniMap lat={first.venue_lat} lng={first.venue_lng} venue={first.venue_name} />
+          </button>
+        )}
         {mapOpen && <VenueMapModal ev={first} onClose={closeMap} />}
       </div>
       <div className="min-w-0 flex-1">
-        <span className="inline-block rounded-full border-2 border-[#111] px-2 py-0.5 text-[11px] font-extrabold uppercase tracking-wide text-[#111]">
-          {cat.emoji} {cat.label}
-        </span>
-        <h3 className="font-poster mt-1.5 text-[26px] leading-[1.03] text-[#111] sm:text-[30px]">{first.venue_name}</h3>
+        {!compact && (
+          <span className="inline-block rounded-full border-2 border-[#111] px-2 py-0.5 text-[11px] font-extrabold uppercase tracking-wide text-[#111]">
+            {cat.emoji} {cat.label}
+          </span>
+        )}
+        <h3 className={`font-poster leading-[1.03] text-[#111] ${compact ? "text-[24px] sm:text-[27px]" : "mt-1.5 text-[26px] sm:text-[30px]"}`}>{first.venue_name}</h3>
         {!wide && <p className="mt-1 text-[15px] font-bold text-[#111]">{formatDistance(first.distance_km)} away</p>}
         <ul className="mt-2 space-y-1">
           {evs.slice(0, SHOWN).map((ev) => (
@@ -904,13 +998,13 @@ function LineupCard({ evs, paper, wide, open, onToggle }: { evs: NearbyEvent[]; 
             </span>
           </div>
         )}
-        <button type="button" onClick={onToggle} aria-expanded={open} className="going-btn mt-3 rounded-full">
+        <button type="button" onClick={() => onToggle(id)} aria-expanded={open} className="going-btn mt-3 rounded-full">
           {open ? "Show less" : "See all"}
         </button>
       </div>
     </div>
   );
-}
+});
 
 function EmptyState({ hasLocation }: { hasLocation: boolean }) {
   return (

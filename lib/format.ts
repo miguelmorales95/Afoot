@@ -24,40 +24,40 @@ export function categoryMeta(cat: string | null) {
 
 const TZ = "America/Los_Angeles";
 
+// Built once: creating an Intl.DateTimeFormat is slow, and the feed formats every event's
+// dates several times on each filter change.
+const YMD_US = new Intl.DateTimeFormat("en-US", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" });
+const DAY_LABEL = new Intl.DateTimeFormat("en-US", { timeZone: TZ, weekday: "short", month: "short", day: "numeric" });
+const YMD_ISO = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" });
+const TIME = new Intl.DateTimeFormat("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" });
+// Day keys repeat (one per event date), so remember them.
+const dayKeys = new Map<string, string>();
+
 /** e.g. "Sat, Mar 1" */
 export function formatDayLabel(iso: string): string {
   const d = new Date(iso);
   const today = new Date();
-  const fmt = (dd: Date) =>
-    new Intl.DateTimeFormat("en-US", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(dd);
+  const fmt = (dd: Date) => YMD_US.format(dd);
   const tomorrow = new Date(today.getTime() + 86400000);
   if (fmt(d) === fmt(today)) return "Today";
   if (fmt(d) === fmt(tomorrow)) return "Tomorrow";
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: TZ,
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  }).format(d);
+  return DAY_LABEL.format(d);
 }
 
 /** Group key stable per calendar day in LA time. */
 export function dayKey(iso: string): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: TZ,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date(iso));
+  let k = dayKeys.get(iso);
+  if (k === undefined) {
+    k = YMD_ISO.format(new Date(iso));
+    if (dayKeys.size > 20000) dayKeys.clear();
+    dayKeys.set(iso, k);
+  }
+  return k;
 }
 
 /** e.g. "7:00 PM" */
 export function formatTime(iso: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: TZ,
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(iso));
+  return TIME.format(new Date(iso));
 }
 
 export function formatDistance(km: number): string {
@@ -79,12 +79,7 @@ export function priceValue(price: string | null): number {
 
 /** "Sat, Mar 1" compact date for table cells. */
 export function formatShortDate(iso: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: TZ,
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  }).format(new Date(iso));
+  return DAY_LABEL.format(new Date(iso));
 }
 
 // Words that carry no meaning on their own: articles, prepositions, pronouns, conjunctions,
@@ -106,8 +101,19 @@ const FILLER = new Set(
     "listing listings listed list given exact hour hours time times session sessions start starts recurring " +
     "details info information tba tbd website page " +
     // Street words are part of the location.
-    "avenue ave street st boulevard blvd road rd drive dr way lane ln suite floor").split(" "),
+    "avenue ave street st boulevard blvd road rd drive dr way lane ln suite floor " +
+    // Words the AI uses when it writes about the listing ("doesn't describe the activity").
+    "describe describes described description format end ends ending activity setting mention mentions mentioned " +
+    "unclear unknown unspecified specific general various note notes include included type kind sort " +
+    // Calendar-feed labels ("Location: Room 101 · Organization: … · Contact person"): metadata, not the event.
+    "location locations locator room rooms organization organizer organizers contact person name title date dates " +
+    "calendar link links url web site copy credit src streaming stream video tickets ticket rsvp register " +
+    // Where it is: the card already shows the venue and the map.
+    "center centre hall building campus main complex auditorium pavilion plaza gymnasium gym fieldhouse field " +
+    "venue usa united states calif california county p.m a.m please use provided part only two three four").split(" "),
 );
+
+const STREET = /^(avenue|ave|street|st|boulevard|blvd|road|rd|drive|dr|way|lane|ln|highway|hwy|parkway|pkwy|place|pl|court|ct)$/;
 
 // Dates and times are already on the card.
 const WHEN = new Set(
@@ -119,7 +125,7 @@ const WHEN = new Set(
 );
 
 // A sentence that describes the listing rather than the event.
-const LISTING_NOTE = /\b(isn'?t|is not|not|aren'?t|wasn'?t)\s+(listed|given|provided|posted|shown|available|specified|confirmed)\b|\bdefault\b|\b(check|confirm) (the|with|their|its)\b|\b(tba|tbd)\b/i;
+const LISTING_NOTE = /\b(isn'?t|is not|not|aren'?t|wasn'?t)\s+(listed|given|provided|posted|shown|available|specified|confirmed)\b|\bdefault\b|\b(check|confirm) (the|with|their|its)\b|\b(tba|tbd)\b|\b(listing|description|page|post|source)\b.{0,40}\b(doesn'?t|does not|didn'?t|did not|don'?t)\b|\bno (further |more |other )?(details|description|information|info)\b|\bthere is no\b/i;
 
 const norm = (w: string) => w.toLowerCase().replace(/[\u2018\u2019]/g, "'").replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, "");
 const stem = (w: string) => w.replace(/'s$/, "").replace(/(?<=..)s$/, "");
@@ -158,6 +164,12 @@ export function briefWords(
     const tokens = sentence.split(/\s+/);
     for (let i = 0; i < tokens.length; i++) {
       const raw = tokens[i];
+      // Labels ("Location:"), links, emails and single letters are never the gist.
+      if (/:$/.test(raw) || /@|https?:|www\.|\.(com|org|edu|net|gov)\b/i.test(raw)) continue;
+      if (norm(raw).length < 2) continue;
+      // Street names in an address ("1234 Pico Blvd", "Workman Mill Rd"): next to a house number or street word.
+      const near = (j: number) => norm(tokens[j] ?? "");
+      if (STREET.test(near(i + 1)) || STREET.test(near(i + 2)) || /^\d{2,5}$/.test(near(i - 1)) || /^\d{2,5}$/.test(near(i - 2))) continue;
       const w = norm(raw);
       if (!w) continue;
       const s = stem(w);

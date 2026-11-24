@@ -6,6 +6,9 @@ Afoot follows the **company-wide design system**: see [`Company-Design-System.md
 - **Mood:** loud Colby-style show posters stapled to a wooden pole: day-glo paper, heavy black type. Fast and open, "Craigslist for events."
 - **Page:** dark brown (`#2b2119`) with a faint blocky wood grain (`body` background in `app/globals.css`).
 - **Poster colors** (each event keeps one; two in a row never match): yellow `#fff23a`, pink `#ff5fae`, green `#86f45c`, orange `#ff9a3c`, blue `#62d8ff`, on black ink `#111`.
+- **Notes between posters** are quieter on purpose, so they never pass for events: **ads** on newsprint (`#e8e3d6`, gray ink, "AD" / "SPONSORED" over a rule, phones and tablets only since desktop has the rail), **asks** (share a newsletter or site; IG curators) on kraft (`#cdae7e`) with dashed tear-off tabs as the links. One before each day's 6th card, then every 12 (`components/FeedNotes.tsx`).
+- **Compact layout** (toggle in the pinned day header, remembered per device): same poster colors and Anton titles, minus the type badge, street map, gist, description and tags; parking stays.
+- **Gist line** (phones): keywords auto-pulled from the listing, behind a small "GIST" stamp that says so when tapped. Honest about being automatic rather than passing as a write-up.
 - **Type:** Anton (heavy condensed gothic, `next/font`, class `font-poster`) for titles, times, day headers and the logo; system sans for everything else, bold and full black on cards.
 - **Logo:** a silver side-view staple gun + "LIGHT" in yellow, "POLE" in pink (`components/SiteHeader.tsx`; PNGs in `branding/`).
 - **Tone:** quick, local, no-friction; privacy-first (no tracking) is part of the brand.

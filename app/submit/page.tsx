@@ -3,10 +3,30 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
+type Kind = "event" | "venue" | "source";
+type SourceType = keyof typeof SOURCE_TYPES;
+const SOURCE_TYPES = {
+  newsletter: { label: "📬 Newsletter", field: "Signup page or website", placeholder: "https://..." },
+  website: { label: "🌐 Website", field: "Link", placeholder: "https://..." },
+  instagram: { label: "📸 Instagram", field: "Instagram handle or link", placeholder: "@handle" },
+} as const;
+
 export default function SubmitPage() {
-  const [kind, setKind] = useState<"event" | "venue">("event");
-  // /submit?kind=venue opens the venue form (e.g. from a "suggest a venue" link).
-  useEffect(() => { if (new URLSearchParams(window.location.search).get("kind") === "venue") setKind("venue"); }, []);
+  const [kind, setKind] = useState<Kind>("event");
+  // /submit?kind=venue opens the venue form (e.g. from a "suggest a venue" link);
+  // /submit?kind=source&type=instagram&mine=1 opens the source form preset (from the feed's ask cards).
+  const [sourceType, setSourceType] = useState<SourceType>("newsletter");
+  const [mine, setMine] = useState(false);
+  // "This is my account" only means something for an Instagram account.
+  const curator = mine && sourceType === "instagram";
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const k = q.get("kind");
+    if (k === "venue" || k === "source") setKind(k);
+    const t = q.get("type") as SourceType | null;
+    if (t && t in SOURCE_TYPES) setSourceType(t);
+    if (q.get("mine") === "1") setMine(true);
+  }, []);
   const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
   const [message, setMessage] = useState("");
   const [readable, setReadable] = useState(true);
@@ -15,7 +35,7 @@ export default function SubmitPage() {
     e.preventDefault();
     setStatus("sending");
     const fd = new FormData(e.currentTarget);
-    const body = { ...Object.fromEntries(fd.entries()), ...(kind === "event" && { kind: "event" }) };
+    const body = { ...Object.fromEntries(fd.entries()), ...(kind !== "venue" && { kind }) };
     try {
       const res = await fetch("/api/submit", {
         method: "POST",
@@ -38,7 +58,11 @@ export default function SubmitPage() {
         <div className="text-4xl">🎉</div>
         <h1 className="mt-4 text-2xl font-bold">Thanks — got it!</h1>
         <p className="mt-2 text-white/60">
-          {kind === "event"
+          {kind === "source"
+            ? mine
+              ? "Thanks! We'll take a look at your page and reach out about crediting your posts."
+              : "Thanks! We'll check it out and start pulling events from it if it's a fit."
+            : kind === "event"
             ? readable
               ? "We read the event from the link. Someone checks it, then it shows up on Light Pole."
               : "We couldn't read that page by ourselves, so we'll use the details you typed. Someone checks it before it shows up."
@@ -57,15 +81,60 @@ export default function SubmitPage() {
   return (
     <main className="mx-auto max-w-lg px-4 py-12">
       <div className="flex gap-2 rounded-full bg-white/5 p-1 text-sm" role="tablist">
-        {(["event", "venue"] as const).map((k) => (
+        {(["event", "venue", "source"] as const).map((k) => (
           <button key={k} type="button" role="tab" aria-selected={kind === k} onClick={() => setKind(k)}
-            className={`flex-1 rounded-full px-4 py-2 font-semibold ${kind === k ? "bg-fuchsia-600 text-white" : "text-white/60"}`}>
-            {k === "event" ? "Add an event" : "Add a venue"}
+            className={`flex-1 rounded-full px-2 py-2 font-semibold ${kind === k ? "bg-fuchsia-600 text-white" : "text-white/60"}`}>
+            {k === "event" ? "Event" : k === "venue" ? "Venue" : "Source"}
           </button>
         ))}
       </div>
 
-      {kind === "event" ? (
+      {kind === "source" ? (
+        <>
+          <h1 className="mt-6 text-2xl font-bold tracking-tight">{curator ? "Become a curator" : "Share a source"}</h1>
+          <p className="mt-2 text-sm text-white/60">
+            {mine
+              ? "Post LA events on Instagram? Tell us your handle. We add the events you post, credited to you and linked back to your page."
+              : "A newsletter, a website, or an Instagram account that posts LA events we're missing. We'll check it out and start pulling events from it."}
+          </p>
+          <form onSubmit={onSubmit} className="mt-8 space-y-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-white/80">What is it?</label>
+              <div className="flex flex-wrap gap-1.5">
+                {(Object.keys(SOURCE_TYPES) as SourceType[]).map((t) => (
+                  <button key={t} type="button" onClick={() => setSourceType(t)} aria-pressed={sourceType === t}
+                    className={`rounded-full px-3 py-1.5 text-sm ${sourceType === t ? "bg-white text-black" : "bg-white/5 text-white/70 hover:bg-white/10"}`}>
+                    {SOURCE_TYPES[t].label}
+                  </button>
+                ))}
+              </div>
+              <input type="hidden" name="source_type" value={sourceType} />
+            </div>
+            <Field key={sourceType} label={`${SOURCE_TYPES[sourceType].field} *`} name="source_url" required placeholder={SOURCE_TYPES[sourceType].placeholder} />
+            <Field label="Name" name="source_name" placeholder="e.g. 'LA Taco newsletter' or 'Eastside DIY shows'" />
+            {sourceType === "instagram" && (
+              <label className="flex items-center gap-2 text-sm text-white/80">
+                <input type="checkbox" name="mine" value="1" checked={mine} onChange={(e) => setMine(e.target.checked)} className="h-4 w-4 accent-fuchsia-600" />
+                This is my account. I&apos;d like to be a Light Pole curator.
+              </label>
+            )}
+            <div>
+              <label className="mb-1 block text-sm font-medium text-white/80">Anything we should know?</label>
+              <textarea name="note" rows={2} placeholder="e.g. 'Posts warehouse shows in the Eastside every week.'"
+                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm outline-none placeholder:text-white/30 focus:border-fuchsia-500/50" />
+            </div>
+            <Field label={curator ? "Your email *" : "Your email (optional)"} name="submitter_email" type="email" required={curator} placeholder="So we can say thanks / follow up" />
+            <input type="text" name="company" tabIndex={-1} autoComplete="off" className="absolute left-[-9999px]" aria-hidden="true" />
+            {status === "error" && (
+              <p className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">{message}</p>
+            )}
+            <button type="submit" disabled={status === "sending"}
+              className="w-full rounded-full bg-fuchsia-600 px-5 py-3 text-sm font-semibold text-white hover:bg-fuchsia-500 disabled:opacity-50">
+              {status === "sending" ? "Sending…" : curator ? "Sign me up" : "Share it"}
+            </button>
+          </form>
+        </>
+      ) : kind === "event" ? (
         <>
           <h1 className="mt-6 text-2xl font-bold tracking-tight">Add an event</h1>
           <p className="mt-2 text-sm text-white/60">

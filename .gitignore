@@ -42,3 +42,4 @@ SC_2_Afoot/needs-review/
 
 # inbox scans (npm run scan:inbox): senders and calendar entries from personal accounts, keep local
 /inbox-scans/
+.weekly-email/

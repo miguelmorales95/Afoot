@@ -1,0 +1,199 @@
+<title>Light Pole Ranking Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: one narrow column, like a phone feed; controls on top, the day's order below. */
+:root {
+  --bg: #f6f3ee; --surface: #ffffff; --fg: #1c1916; --muted: #6d665e; --line: #e2dcd2;
+  --accent: #c41f6e; --indie: #1f7a3a; --indie-bg: #e3f3e6; --big: #a14d00; --big-bg: #fbe8d4;
+  --inst: #4a5868; --inst-bg: #e6eaef; --up: #1f7a3a; --down: #b3261e;
+  --display: "Anton", Impact, "Arial Narrow", sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #1d1915; --surface: #27221c; --fg: #f1ebe2; --muted: #a59c90; --line: #3a332b;
+  --accent: #ff6fb5; --indie: #8be29d; --indie-bg: #1f3a25; --big: #ffb36b; --big-bg: #43301b;
+  --inst: #b6c3d2; --inst-bg: #2c333c; --up: #8be29d; --down: #ff8a80; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #1d1915; --surface: #27221c; --fg: #f1ebe2; --muted: #a59c90; --line: #3a332b;
+  --accent: #ff6fb5; --indie: #8be29d; --indie-bg: #1f3a25; --big: #ffb36b; --big-bg: #43301b;
+  --inst: #b6c3d2; --inst-bg: #2c333c; --up: #8be29d; --down: #ff8a80; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font: 15px/1.45 var(--body); }
+.wrap { max-width: 760px; margin: 0 auto; padding-block: 24px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 18px; }
+h1 { font: 400 34px/1 var(--display); letter-spacing: .01em; margin: 0; text-transform: uppercase; }
+p { margin: 0; }
+.lede { color: var(--muted); max-width: 62ch; }
+.controls { display: grid; gap: 12px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+label.small, .small { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+select, input[type=range] { font: inherit; accent-color: var(--accent); }
+select { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.tab { font: 600 14px var(--body); padding: 7px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer; }
+.tab[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.tab:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.how { font-size: 14px; color: var(--muted); max-width: 66ch; }
+.how b { color: var(--fg); }
+.strength { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.strength output { font: 500 14px var(--mono); min-width: 3ch; }
+.summary { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+.summary th, .summary td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--line); font-size: 14px; white-space: nowrap; }
+.summary th:first-child, .summary td:first-child { text-align: left; }
+.summary th { font-size: 12px; color: var(--muted); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.summary tr.on td { font-weight: 700; }
+.list { display: grid; gap: 0; border-top: 1px solid var(--line); }
+.item { display: grid; grid-template-columns: 2.2em 4.2em minmax(0, 1fr) auto; gap: 4px 10px; align-items: baseline; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.rank { font: 400 22px/1 var(--display); }
+.move { font: 500 13px var(--mono); white-space: nowrap; }
+.move.up { color: var(--up); } .move.down { color: var(--down); } .move.same { color: var(--muted); }
+.title { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.meta { grid-column: 3 / 5; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); }
+.score { font: 500 15px var(--mono); text-align: right; }
+.score small { display: block; color: var(--muted); font-size: 11px; }
+.chip { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; }
+.chip.indie { background: var(--indie-bg); color: var(--indie); }
+.chip.big { background: var(--big-bg); color: var(--big); }
+.chip.institution { background: var(--inst-bg); color: var(--inst); }
+.newtop { color: var(--accent); font-weight: 700; font-size: 12px; }
+.fold { padding: 8px 0; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); font-weight: 700; border-bottom: 2px dashed var(--accent); }
+.note { font-size: 13px; color: var(--muted); }
+</style>
+
+<div class="wrap">
+  <header style="display:grid;gap:8px">
+    <h1>Ranking lab</h1>
+    <p class="lede">How each day's order on Light Pole would change if small, independent spots got a boost. Each row is a card as the phone shows it, with several shows at one venue on one line.</p>
+  </header>
+
+  <section class="controls" aria-label="Controls">
+    <div class="row">
+      <label class="small" for="day">Day</label>
+      <select id="day"></select>
+    </div>
+    <div class="tabs" role="group" aria-label="Ranking method" id="tabs"></div>
+    <p class="how" id="how"></p>
+    <div class="strength" id="strengthRow">
+      <label class="small" for="n">Strength</label>
+      <input type="range" id="n" min="0" max="40" step="1">
+      <output id="nOut" for="n"></output>
+    </div>
+  </section>
+
+  <section class="summary" aria-label="Indie share of the top 15">
+    <table>
+      <thead><tr><th>Method</th><th>Indie in top 15, this day</th><th>Institutions</th><th>Indie, all days</th></tr></thead>
+      <tbody id="sum"></tbody>
+    </table>
+  </section>
+
+  <section aria-label="The day's order">
+    <div class="list" id="list"></div>
+    <p class="note" id="foot" style="margin-top:12px"></p>
+  </section>
+</div>
+
+<script>
+const METHODS = {
+  current: { label: "Current", n: 0, how: "<b>Today's order.</b> The nightly traffic score: venue fame from Wikipedia views, category, one-off vs. weekly, weekends, free, and recent taps." },
+  A: { label: "A · Flat indie boost", n: 15, how: "<b>Boost them all equally.</b> Every event at an independent venue (not a school, library, city calendar, museum, or big landmark) gets +N." },
+  B: { label: "B · Fame stops counting", n: 15, how: "<b>Take back the fame points</b> the score gives well-known venues, then independent venues get up to +N, more the less known they are. Schools and city calendars get nothing." },
+  C: { label: "C · Where it came from", n: 20, how: "<b>Boost by source.</b> IG curator +N, a link or newsletter someone sent +0.8N, an independent venue's own site +0.5N, ticketing sites and big venues 0, school and city calendar feeds −0.4N. No curator events exist yet, so this shows only the other parts." },
+};
+const state = { method: "B", n: { current: 0, A: 15, B: 15, C: 20 }, day: null };
+let D;
+
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+function score(m, e, n) {
+  const [, vi, , ch, s] = e, [, scene, draw] = D.venues[vi];
+  if (m === "A") return s + (scene === "indie" ? n : 0);
+  if (m === "B") return s - 0.55 * (draw - 30) + (scene === "indie" ? n * clamp((60 - draw) / 40, 0, 1) : 0);
+  if (m === "C") {
+    if (ch === "curator") return s + n;
+    if (ch === "community") return s + 0.8 * n;
+    if (scene === "institution" || ch === "feed") return s - 0.4 * n;
+    if (scene === "indie" && ch === "venue_site") return s + 0.5 * n;
+    return s;
+  }
+  return s;
+}
+
+// The day's cards: one per event (its first time that day); events of one category at one
+// venue fold into a lineup card that sits where its best show would.
+function cards(day, m, n) {
+  const seen = new Map();
+  for (const [ei, min] of D.days[day] || []) if (!seen.has(ei) || seen.get(ei) > min) seen.set(ei, min);
+  const groups = new Map();
+  for (const [ei, min] of seen) {
+    const e = D.events[ei], key = e[1] + "|" + e[2];
+    const g = groups.get(key) || { key, evs: [] };
+    g.evs.push({ ei, min, s: score(m, e, n), s0: e[4] });
+    groups.set(key, g);
+  }
+  const out = [...groups.values()].map((g) => {
+    g.evs.sort((a, b) => b.s - a.s);
+    const top = g.evs[0];
+    return { key: g.key, ei: top.ei, n: g.evs.length, s: top.s, s0: Math.max(...g.evs.map((x) => x.s0)), min: Math.min(...g.evs.map((x) => x.min)) };
+  });
+  return out.sort((a, b) => b.s - a.s || b.s0 - a.s0 || a.min - b.min);
+}
+const sceneOf = (c) => D.venues[D.events[c.ei][1]][1];
+function shares(day, m, n) {
+  const top = cards(day, m, n).slice(0, 15);
+  return { indie: top.filter((c) => sceneOf(c) === "indie").length, inst: top.filter((c) => sceneOf(c) === "institution").length, of: top.length };
+}
+
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const time = (min) => { const h = Math.floor(min / 60), mm = String(min % 60).padStart(2, "0"); return `${h % 12 || 12}:${mm} ${h < 12 ? "AM" : "PM"}`; };
+const CH = { curator: "IG curator", community: "sent in", venue_site: "venue site", ticketing: "ticketing site", feed: "calendar feed" };
+
+function render() {
+  const m = state.method, n = state.n[m];
+  document.querySelectorAll(".tab").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.m === m)));
+  document.getElementById("how").innerHTML = METHODS[m].how;
+  document.getElementById("strengthRow").hidden = m === "current";
+  const r = document.getElementById("n"); r.value = n; document.getElementById("nOut").value = "+" + n;
+
+  const days = Object.keys(D.days).sort();
+  document.getElementById("sum").innerHTML = Object.keys(METHODS).map((k) => {
+    const nn = state.n[k], s = shares(state.day, k, nn);
+    let a = 0, b = 0; for (const d of days) { const x = shares(d, k, nn); a += x.indie; b += x.of; }
+    return `<tr class="${k === m ? "on" : ""}"><td>${esc(METHODS[k].label)}</td><td>${s.indie} of ${s.of}</td><td>${s.inst}</td><td>${Math.round((100 * a) / Math.max(1, b))}%</td></tr>`;
+  }).join("");
+
+  const base = cards(state.day, "current", 0), was = new Map(base.map((c, i) => [c.key, i]));
+  const now = cards(state.day, m, n);
+  const rows = now.slice(0, 25).map((c, i) => {
+    const e = D.events[c.ei], v = D.venues[e[1]], p = was.get(c.key);
+    const d = p - i;
+    const move = m === "current" ? `<span class="move same">·</span>` : d > 0 ? `<span class="move up">▲${d}</span>` : d < 0 ? `<span class="move down">▼${-d}</span>` : `<span class="move same">=</span>`;
+    const isNew = m !== "current" && i < 15 && p >= 15 ? `<span class="newtop">new in top 15 (was ${p + 1})</span>` : "";
+    const title = c.n > 1 ? `${esc(v[0])} <span style="color:var(--muted);font-weight:500">· ${c.n} shows</span>` : esc(e[0]);
+    const fold = i === 15 ? `<div class="fold">Above this line: what a phone shows before “Show more”</div>` : "";
+    return `${fold}<div class="item"><span class="rank">${i + 1}</span>${move}<span class="title">${title}</span><span class="score">${Math.round(c.s)}${m !== "current" ? `<small>was ${c.s0}</small>` : ""}</span>
+      <div class="meta"><span class="chip ${v[1]}">${v[1]}</span><span>${c.n > 1 ? "" : esc(v[0]) + " · "}${time(c.min)} · ${CH[e[3]]}</span>${isNew}</div></div>`;
+  });
+  document.getElementById("list").innerHTML = rows.join("");
+  const dropped = base.slice(0, 15).filter((c) => now.findIndex((x) => x.key === c.key) >= 15);
+  document.getElementById("foot").textContent = m === "current" ? `${base.length} cards this day.` :
+    dropped.length ? `Pushed out of the top 15: ${dropped.map((c) => { const e = D.events[c.ei]; return c.n > 1 ? D.venues[e[1]][0] : e[0]; }).join("; ")}.` : "Nothing left the top 15.";
+}
+
+function start() {
+  const sel = document.getElementById("day");
+  const fmt = new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+  const days = Object.keys(D.days).sort();
+  sel.innerHTML = days.map((d) => `<option value="${d}">${fmt.format(new Date(d + "T12:00:00Z"))} · ${D.days[d].length} listings</option>`).join("");
+  state.day = days.includes("2026-12-03") ? "2026-12-03" : days[0];
+  sel.value = state.day;
+  sel.onchange = () => { state.day = sel.value; render(); };
+  document.getElementById("tabs").innerHTML = Object.entries(METHODS).map(([k, v]) => `<button class="tab" data-m="${k}" type="button">${esc(v.label)}</button>`).join("");
+  document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => { state.method = b.dataset.m; render(); }));
+  document.getElementById("n").oninput = (e) => { state.n[state.method] = Number(e.target.value); render(); };
+  render();
+}
+
+fetch("rank-lab-data.json").then((r) => r.json()).then((d) => { D = d; start(); })
+  .catch(() => { document.getElementById("list").textContent = "Couldn't load rank-lab-data.json. Run npm run rank:lab and open the page from that folder."; });
+</script>

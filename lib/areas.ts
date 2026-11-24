@@ -1,5 +1,5 @@
-// Launch neighborhoods: shown as one-tap shortcuts under the search box, with fixed
-// coordinates so they never depend on geocoding. Order = launch priority.
+// Launch areas: what area sponsors buy (lib/ads.ts, /admin), with fixed coordinates.
+// Order = launch priority. The search box's suggestions live in lib/places.ts.
 
 export interface LaunchArea { name: string; lat: number; lng: number }
 

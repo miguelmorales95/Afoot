@@ -34,7 +34,10 @@
     "recategorize-art": "tsx scripts/recategorize-art.ts",
     "venue-parking": "tsx scripts/venue-parking.ts",
     "digest": "tsx scripts/digest.ts",
-    "rank": "tsx scripts/rank.ts"
+    "rank": "tsx scripts/rank.ts",
+    "weekly-email": "tsx scripts/weekly-email.ts",
+    "rank:lab": "tsx scripts/rank-lab.ts",
+    "voice:lab": "tsx scripts/voice-lab.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.65.0",

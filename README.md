@@ -501,8 +501,8 @@ Until then the site behaves as before, with house promos in every slot.
 - Every paid card says **Sponsored** and has a *Why am I seeing this?* note: "Afoot shows the same
   sponsor to everyone browsing this area. We don't track you."
 
-**Which area a visitor is browsing** is worked out in the browser: the neighborhood chip they
-tapped, or the launch area within ~6 km of the place they searched or their location (nearest
+**Which area a visitor is browsing** is worked out in the browser: the launch area they picked
+from the search suggestions, or the launch area within ~6 km of the place they searched or their location (nearest
 wins). The browser downloads all live campaigns (`/api/ads/live`, identical for everyone) and picks
 locally, so no location is sent for ads.
 
@@ -570,3 +570,16 @@ These are deliberate MVP cuts, roughly in priority order:
 - The ingest/cron routes call the paid Claude API — the cron route is gated behind `CRON_SECRET`.
 - Respect venue sites: the fetcher identifies itself and times out; keep ingestion to a
   reasonable cadence (the default cron is daily).
+
+## Weekly email ("your week on the pole")
+
+The ✉ button in the header signs someone up with the filters they have on (place + event types).
+Double opt-in: `/api/newsletter/subscribe` emails a confirm link; nothing weekly goes out until it's
+tapped. Subscribers live in `afoot.email_subscribers` (migration `20261125000000_weekly_email.sql`).
+
+- Write this week's note in `content/weekly-note.md` (plain text, your own words).
+- `npm run weekly-email -- --dry-run` writes each email to `.weekly-email/`; `-- --to you@example.com` sends one test.
+- `npm run weekly-email` sends to everyone confirmed. Picks are the next 7 days by `traffic_score`, one card
+  per venue, 3 per day, 15 max. Needs `RESEND_API_KEY` (and `WEEKLY_EMAIL_FROM` if not miguel@somedude.app).
+
+`npm run rank:lab` builds a page comparing small-spot ranking boosts on real days (read-only).

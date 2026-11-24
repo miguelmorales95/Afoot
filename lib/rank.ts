@@ -13,6 +13,26 @@ export interface RankInput {
   free: boolean;
   clicks7: number;        // taps in the last 7 days
   clicksPrev7: number;    // taps in the 7 days before that
+  scene?: Scene;          // indie venues get INDIE_BOOST (see venueScene)
+}
+
+// Small spots first: every event at an indie venue gets the same boost (method A at +25, picked
+// 2026-11-24 in the ranking lab, npm run rank:lab). Tune here.
+export const INDIE_BOOST = 25;
+
+export type Scene = "indie" | "big" | "institution";
+const INSTITUTION = /universit|college|school|library|museum|city of|council|\bpark\b|parks|athletics|recreation|church|chamber|institute|academy|county|department/i;
+// Big by nature even when Wikipedia doesn't know them: malls, arenas, landmark venues.
+const BIG_NAME = /outlets|americana|\bmall\b|\bplaza\b|arena|stadium|\bbowl\b|\bforum\b|the grove|universal|getty|\bthe broad\b|crypto|sofi|dodger|palladium|greek theatre/i;
+
+/** institution: from a calendar feed (colleges, councils, parks, libraries), or the name or a
+ *  .edu/.gov event link says so. big: famous (draw >= 60) or a mall/arena-type name. indie: the rest. */
+export function venueScene(v: { name: string; source?: string | null; draw?: number | null }, eventUrl?: string | null): Scene {
+  let host = "";
+  try { host = eventUrl ? new URL(eventUrl).hostname : ""; } catch { /* not a URL */ }
+  if (v.source === "feed" || INSTITUTION.test(v.name) || /\.(edu|gov)$/.test(host)) return "institution";
+  if ((v.draw ?? 30) >= 60 || BIG_NAME.test(v.name)) return "big";
+  return "indie";
 }
 
 const CATEGORY: Record<string, number> = { music: 10, comedy: 8, market: 8, food: 6, games: 3, trivia: 3, karaoke: 3, class: -4 };
@@ -35,6 +55,7 @@ export function trafficScore(x: RankInput): number {
   else if (STUDENT.test(x.title)) s -= 12;
   // Taps: a little credit for being tapped, more for taking off (going viral).
   s += Math.min(10, 2.5 * Math.log2(1 + x.clicks7));
+  if (x.scene === "indie") s += INDIE_BOOST;
   if (x.clicks7 >= 5) s += Math.max(0, Math.min(15, 6 * Math.log2((x.clicks7 + 1) / (x.clicksPrev7 + 1))));
   return Math.max(1, Math.min(100, Math.round(s)));
 }

@@ -1,0 +1,153 @@
+<title>Light Pole Voice Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Caveat:wght@600;700&family=Inter:wght@400;600;800&display=swap">
+<style>
+  /* Layout: one phone-width column of poster cards on the pole, controls pinned on top.
+     Single look on purpose (the app's dark pole), so no light theme. */
+  :root {
+    --wood: #2b2119;
+    --wood-2: #3a2d23;
+    --ink: #111;
+    --paper-fg: #f3ece2;
+    --muted: #b9ab9a;
+    --yellow: #fff23a;
+    --pink: #ff5fae;
+    --green: #86f45c;
+    --orange: #ff9a3c;
+    --blue: #62d8ff;
+    --pencil: #2c3a8c;
+    --display: "Anton", Impact, "Arial Narrow", sans-serif;
+    --body: "Inter", ui-sans-serif, system-ui, sans-serif;
+    --hand: "Caveat", "Segoe Print", "Bradley Hand", cursive;
+    color-scheme: dark;
+  }
+  body { background: var(--wood); color: var(--paper-fg); font-family: var(--body); }
+  body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--wood); }
+  .wrap { max-width: 560px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 48px; }
+  h1 { font-family: var(--display); font-weight: 400; text-transform: uppercase; font-size: 34px; line-height: 1; margin: 0; letter-spacing: .01em; }
+  h1 .a { color: var(--yellow); } h1 .b { color: var(--pink); }
+  .lede { color: var(--muted); font-size: 14px; line-height: 1.5; margin: 10px 0 0; max-width: 60ch; }
+  .bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: color-mix(in srgb, var(--wood) 94%, transparent); backdrop-filter: blur(6px); padding: 12px 0 10px; margin-top: 12px; display: grid; gap: 8px; }
+  .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+  .seg button { font: 600 13px/1 var(--body); color: var(--paper-fg); background: var(--wood-2); border: 1px solid #ffffff1f; border-radius: 999px; padding: 8px 12px; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--paper-fg); color: var(--ink); border-color: transparent; }
+  .seg button:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
+  .legend { font-size: 13px; color: var(--muted); line-height: 1.45; min-height: 2.9em; margin: 0; }
+  .stack { display: grid; margin-top: 8px; }
+  .card { position: relative; background: var(--paper); color: var(--ink); border-radius: 2px; padding: 22px 16px 18px; transform: rotate(var(--tilt)); box-shadow: 0 6px 14px #00000059; display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 12px; }
+  .card + .card { margin-top: -10px; }
+  .card::before, .card::after { content: ""; position: absolute; top: 8px; width: 18px; height: 4px; border-radius: 1px; background: linear-gradient(#eef0f2, #aeb3b8); box-shadow: 0 1px 1px #00000080; }
+  .card::before { left: 16px; transform: rotate(-4deg); } .card::after { right: 16px; transform: rotate(3deg); }
+  .time { align-self: start; background: var(--ink); color: var(--paper); font-family: var(--display); font-size: 21px; text-align: center; padding: 6px 2px; border-radius: 2px; line-height: 1; }
+  .rank { font: 800 11px/1 var(--body); text-align: center; margin-top: 6px; letter-spacing: .08em; text-transform: uppercase; }
+  .scene { display: inline-block; margin-top: 4px; font: 800 10px/1 var(--body); text-transform: uppercase; letter-spacing: .1em; border: 1.5px solid var(--ink); border-radius: 999px; padding: 3px 6px; }
+  .title { font-family: var(--display); font-weight: 400; font-size: 25px; line-height: 1.04; margin: 0; text-wrap: balance; overflow-wrap: anywhere; }
+  .venue { font-weight: 800; font-size: 14px; margin: 4px 0 0; }
+  .versions { display: grid; gap: 8px; margin-top: 8px; }
+  .v { display: grid; gap: 2px; }
+  .v .tag { font: 800 10px/1 var(--body); letter-spacing: .14em; text-transform: uppercase; opacity: .55; }
+  .gist { font-weight: 800; font-size: 12.5px; letter-spacing: .08em; text-transform: uppercase; line-height: 1.35; margin: 0; }
+  .gist .stamp { display: inline-block; border: 1.5px solid #0009; border-radius: 3px; padding: 0 4px; font-size: 9.5px; letter-spacing: .12em; margin-right: 6px; vertical-align: 1px; }
+  .gist .dot { opacity: .4; margin: 0 5px; }
+  .hand { font-family: var(--hand); font-weight: 700; font-size: 21px; line-height: 1.05; color: var(--pencil); margin: 0; transform: rotate(-1deg); }
+  .say { font-weight: 700; font-size: 15px; line-height: 1.35; margin: 0; }
+  .none { font-size: 13px; font-style: italic; opacity: .6; margin: 0; }
+  .all .v + .v { border-top: 1.5px dashed #0003; padding-top: 7px; }
+  details { margin-top: 28px; background: var(--wood-2); border: 1px solid #ffffff14; border-radius: 12px; padding: 14px 16px; }
+  summary { cursor: pointer; font-weight: 700; }
+  details pre { white-space: pre-wrap; font: 13px/1.5 var(--body); color: var(--muted); margin: 10px 0 0; }
+  details ul { margin: 10px 0 0; padding-left: 18px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+  .foot { color: var(--muted); font-size: 12px; margin-top: 18px; }
+  @media (prefers-reduced-motion: reduce) { .card, .hand { transform: none; } }
+</style>
+
+<div class="wrap">
+  <h1><span class="a">Voice</span> <span class="b">lab</span></h1>
+  <p class="lede">Real cards from the pole, in the order the site now ranks them (small spots +25). Each card shows the line it has today and three ways of mixing Miguel's own voice into it. Pencil lettering marks words meant to sound like him.</p>
+
+  <div class="bar">
+    <div class="seg" id="days" role="group" aria-label="Day"></div>
+    <div class="seg" id="ways" role="group" aria-label="Version"></div>
+    <p class="legend" id="legend"></p>
+  </div>
+
+  <div class="stack" id="stack"></div>
+
+  <details>
+    <summary>The voice notes the AI versions follow</summary>
+    <pre id="voice"></pre>
+  </details>
+  <details>
+    <summary>Way 3: the lines are drafts for you to rewrite</summary>
+    <ul>
+      <li>Way 3 uses no AI voice. You write about a dozen short lines once, one per kind of event (small-room music, comedy, trivia, campus or city events, markets…), and the app picks one by rule.</li>
+      <li>The lines shown here are my drafts in your style. The real version is your own words, which makes it the only way where the voice is actually yours.</li>
+      <li>It repeats: every small-room comedy show gets the same line. Ten to twenty lines rotating by category is about where that stops being noticeable.</li>
+    </ul>
+  </details>
+  <p class="foot" id="foot"></p>
+</div>
+
+<script>
+  const DATA = /*DATA*/null;
+  const PAPER = ["#fff23a", "#ff5fae", "#86f45c", "#ff9a3c", "#62d8ff"];
+  const WAYS = [
+    { key: "all", label: "All four", legend: "Every version on each card, top to bottom: today, then ways 1 to 3." },
+    { key: "today", label: "Today", legend: "What the card says now: words a robot pulled from the listing, behind the GIST stamp." },
+    { key: "aside", label: "1 · Margin note", legend: "Way 1: the auto gist stays as is, and the AI adds one short aside in your voice, like a note penciled on the flyer. Lightest touch." },
+    { key: "rewrite", label: "2 · Rewrite", legend: "Way 2: the AI rewrites the whole line in your voice. Reads the most human, and it's the most AI pretending to be you." },
+    { key: "line", label: "3 · Your lines", legend: "Way 3: no AI voice. A line you wrote once for this kind of event, picked by rule. Drafts below; you'd replace them." },
+  ];
+  const days = Object.keys(DATA.days);
+  let day = days[0], way = "all";
+  try { way = localStorage.getItem("voicelab-way") || way; } catch (e) {}
+
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const dayLabel = (d) => new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(d + "T12:00:00Z"));
+  const hash = (s) => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; };
+
+  function gistHtml(words, stamp) {
+    if (!words.length) return '<p class="none">No keyword line on this card (nothing useful left after filtering).</p>';
+    return `<p class="gist">${stamp ? '<span class="stamp">Gist</span>' : ""}${words.map(esc).join('<span class="dot" aria-hidden="true">·</span>')}</p>`;
+  }
+  function version(c, k) {
+    if (k === "today") return gistHtml(c.gist, true);
+    if (k === "aside") return gistHtml(c.gist, false) + (c.aside ? `<p class="hand">${esc(c.aside)}</p>` : "");
+    if (k === "rewrite") return c.rewrite ? `<p class="say">${esc(c.rewrite)}</p>` : '<p class="none">No rewrite.</p>';
+    return `<p class="hand">${esc(c.line)}</p>`;
+  }
+  const TAGS = { today: "Today", aside: "1 · Margin note", rewrite: "2 · Rewrite", line: "3 · Your lines" };
+
+  function render() {
+    document.getElementById("days").innerHTML = days.map((d) => `<button type="button" data-day="${d}" aria-pressed="${d === day}">${dayLabel(d)}</button>`).join("");
+    document.getElementById("ways").innerHTML = WAYS.map((w) => `<button type="button" data-way="${w.key}" aria-pressed="${w.key === way}">${w.label}</button>`).join("");
+    document.getElementById("legend").textContent = WAYS.find((w) => w.key === way).legend;
+    let prev = -1;
+    document.getElementById("stack").innerHTML = DATA.days[day].map((c, i) => {
+      let p = hash(c.id) % PAPER.length;
+      if (p === prev) p = (p + 1) % PAPER.length;
+      prev = p;
+      const tilt = ((hash(c.id) >> 3) % 5 - 2) * 0.3;
+      const keys = way === "all" ? ["today", "aside", "rewrite", "line"] : [way];
+      return `<article class="card ${way === "all" ? "all" : ""}" style="--paper:${PAPER[p]};--tilt:${tilt}deg">
+        <div><div class="time">${esc(c.time)}</div><div class="rank">#${i + 1}</div><div style="text-align:center"><span class="scene">${esc(c.scene)}</span></div></div>
+        <div style="min-width:0">
+          <h2 class="title">${esc(c.title)}</h2>
+          <p class="venue">${esc(c.venue)}${c.price ? " · " + esc(c.price) : ""}</p>
+          <div class="versions">${keys.map((k) => `<div class="v">${way === "all" ? `<span class="tag">${TAGS[k]}</span>` : ""}${version(c, k)}</div>`).join("")}</div>
+        </div>
+      </article>`;
+    }).join("");
+  }
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    if (b.dataset.day) day = b.dataset.day;
+    if (b.dataset.way) { way = b.dataset.way; try { localStorage.setItem("voicelab-way", way); } catch (err) {} }
+    render();
+  });
+  document.getElementById("voice").textContent = DATA.voice;
+  document.getElementById("foot").textContent = `Built ${new Date(DATA.generated).toLocaleString("en-US", { timeZone: "America/Los_Angeles" })} from live events (npm run voice:lab). Ways 1 and 2 are written by Claude from the listing; nothing here is saved to the site.`;
+  render();
+</script>

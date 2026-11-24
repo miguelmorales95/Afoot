@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { useApp } from "./AppProvider";
 import { suggestMailto } from "@/lib/site";
 
@@ -29,10 +30,31 @@ export default function SiteHeader() {
           >
             + Add an event
           </Link>
+          <NewsletterButton />
           <AuthButton />
         </nav>
       </div>
     </header>
+  );
+}
+
+/** Opens the weekly-email sheet on the home page (which holds the place and type filters). */
+export const NEWSLETTER_EVENT = "lightpole:newsletter";
+function NewsletterButton() {
+  const path = usePathname();
+  const router = useRouter();
+  return (
+    <button
+      onClick={() => (path === "/" ? window.dispatchEvent(new Event(NEWSLETTER_EVENT)) : router.push("/?newsletter=1"))}
+      aria-label="Get these events by email every week"
+      title="Weekly email"
+      className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white/80 hover:bg-white/20 hover:text-white"
+    >
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" aria-hidden>
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <path d="m3.5 6.5 8.5 7 8.5-7" />
+      </svg>
+    </button>
   );
 }
 
@@ -79,14 +101,16 @@ function AuthButton() {
   if (user) {
     return (
       <div className="relative">
+        {/* Just the initial: the full name doesn't need to sit on screen. */}
         <button
           onClick={() => setOpen((o) => !o)}
-          className="flex items-center gap-2 rounded-full bg-white/10 py-1 pl-1 pr-3 text-sm font-medium text-white hover:bg-white/20"
+          aria-label={`Account menu (${user.name})`}
+          title={user.name}
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20"
         >
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#ff8fb1] text-xs text-[#1a1a1a]">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#ff8fb1] text-sm font-semibold text-[#1a1a1a]">
             {user.name.charAt(0).toUpperCase()}
           </span>
-          <span className="max-w-[90px] truncate">{user.name}</span>
         </button>
         {open && (
           <>

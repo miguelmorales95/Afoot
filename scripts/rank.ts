@@ -5,7 +5,7 @@
 //   npm run rank            npm run rank -- --dry (print the top and bottom, save nothing)
 import "./env";
 import { supabase } from "../lib/supabase";
-import { drawFromViews, trafficScore } from "../lib/rank";
+import { drawFromViews, trafficScore, venueScene } from "../lib/rank";
 
 const DAY = 864e5;
 const UA = "AfootRank/1.0 (https://afoot.somedude.app; weekly venue popularity)";
@@ -78,7 +78,7 @@ async function main() {
   const ids = [...dates.keys()];
   const events: Row[] = [];
   for (let i = 0; i < ids.length; i += 200) {
-    const { data, error } = await supabase.from("events").select("id,title,category,price,is_recurring,venue_id").in("id", ids.slice(i, i + 200)).eq("status", "active");
+    const { data, error } = await supabase.from("events").select("id,title,category,price,is_recurring,venue_id,url").in("id", ids.slice(i, i + 200)).eq("status", "active");
     if (error) throw new Error(error.message);
     events.push(...data);
   }
@@ -87,7 +87,7 @@ async function main() {
   const venueIds = [...new Set(events.map((e) => e.venue_id as string))];
   const venues = new Map<string, Row>();
   for (let i = 0; i < venueIds.length; i += 200) {
-    const { data, error } = await supabase.from("venues").select("id,name,city,draw,draw_source,draw_updated_at,default_price").in("id", venueIds.slice(i, i + 200));
+    const { data, error } = await supabase.from("venues").select("id,name,city,source,draw,draw_source,draw_updated_at,default_price").in("id", venueIds.slice(i, i + 200));
     if (error) throw new Error(error.message);
     data.forEach((v) => venues.set(v.id, v));
   }
@@ -124,6 +124,7 @@ async function main() {
         venueDraw: v?.draw ?? 30, title: e.title, category: e.category, recurring: Boolean(e.is_recurring),
         dates: d.n, weekendDates: d.weekend, free: /^free\b/i.test(price),
         clicks7: t?.c7 ?? 0, clicksPrev7: t?.cPrev ?? 0,
+        scene: v ? venueScene(v as { name: string; source: string | null; draw: number | null }, e.url) : undefined,
       }),
     };
   }).sort((a, b) => b.score - a.score);
