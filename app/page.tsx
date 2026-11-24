@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import type { NearbyEvent } from "@/lib/types";
 import {
-  briefDescription,
+  briefWords,
   categoryMeta,
   dayKey,
   formatDayLabel,
@@ -596,7 +596,7 @@ function EventCard({ ev, feedback, featured, paper }: { ev: NearbyEvent; feedbac
   const onTap = () => countClick(ev.event_id);
   const look = flyerLook(ev.event_id, paper);
   const more = ev.occurrence_count_remaining ?? 0;
-  const brief = useMemo(() => ev.tagline || briefDescription(ev), [ev]);
+  const keywords = useMemo(() => briefWords(ev), [ev]);
   const body = (
     <div ref={cardRef} className="flyer flex gap-3 px-4 pb-6 pt-6 sm:gap-4" style={look}>
       <div className="flex w-[104px] shrink-0 flex-col gap-2 sm:w-32">
@@ -662,7 +662,17 @@ function EventCard({ ev, feedback, featured, paper }: { ev: NearbyEvent; feedbac
             <p className="mt-1.5 line-clamp-2 text-[15px] font-medium leading-snug text-black/85">{ev.description}</p>
           </div>
         )}
-        {brief && <p className="mt-1.5 text-[15px] font-semibold leading-snug text-black/85 sm:hidden">{brief}</p>}
+        {/* Phones: keywords pulled from the listing, set like a poster's small print. */}
+        {keywords.length > 0 && (
+          <p className="mt-1.5 flex flex-wrap gap-x-1.5 gap-y-0.5 text-[13px] font-extrabold uppercase leading-snug tracking-[0.08em] text-black/85 sm:hidden">
+            {keywords.map((w, i) => (
+              <span key={w}>
+                {i > 0 && <span aria-hidden className="mr-1.5 opacity-40">·</span>}
+                {w}
+              </span>
+            ))}
+          </p>
+        )}
         {ev.tags && ev.tags.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
             {ev.tags.slice(0, 4).map((t) => (

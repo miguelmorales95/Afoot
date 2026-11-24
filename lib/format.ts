@@ -97,6 +97,10 @@ const FILLER = new Set(
     "also just very more most all any each every some no not there here then now plus etc " +
     "event events held hosted host hosts join come enjoy featuring feature features presents presented " +
     "nothing something everything anything one " +
+    // Generic verbs and question words: they read as noise once pulled out of a sentence.
+    "bring brings make makes made get gets take takes spend spends invite invites play plays test chat stay stayed " +
+    "matter matters learn see watch offer offers include includes including welcome welcomes encouraged available " +
+    "open opens why where how when still always even ever really truly again " +
     // Words about the listing itself, not the event.
     "listing listings listed list given exact hour hours time times session sessions start starts recurring " +
     "details info information tba tbd website page " +
@@ -122,19 +126,19 @@ const wordsOf = (s: string | null | undefined) =>
   (s ?? "").split(/[\s\-/,.()&|:;!?"]+/).map(norm).filter(Boolean);
 
 /**
- * A short description for small screens: the description minus filler words and minus
- * anything the card already shows (title, venue, address, dates and times, tags, category,
- * repeat note), first `max` words kept. Empty when fewer than two words are left: a lone
- * word ("Screening") says nothing the title doesn't.
+ * Keywords for small screens: the event's tagline (or description) minus filler words and
+ * minus anything the card already shows (title, venue, address, dates and times, tags,
+ * category, repeat note), first `max` kept. Empty when fewer than two are left.
  */
-export function briefDescription(
+export function briefWords(
   ev: {
-    description: string | null; title: string; venue_name: string; venue_address?: string | null;
+    tagline?: string | null; description: string | null; title: string; venue_name: string; venue_address?: string | null;
     tags?: string[] | null; category: string | null; recurrence_description?: string | null; price?: string | null;
   },
-  max = 9,
-): string {
-  if (!ev.description) return "";
+  max = 6,
+): string[] {
+  const text = ev.tagline || ev.description;
+  if (!text) return [];
   const shown = new Set<string>(["los", "angeles", "la", "ca"]);
   const cat = categoryMeta(ev.category);
   for (const w of [
@@ -148,7 +152,7 @@ export function briefDescription(
   const out: string[] = [];
   const used = new Set<string>();
   // Sentences about the listing itself ("Start time isn't listed, so the default is used").
-  const sentences = ev.description.split(/(?<=[.!?])\s+/).filter((t) => !LISTING_NOTE.test(t));
+  const sentences = text.split(/(?<=[.!?])\s+/).filter((t) => !LISTING_NOTE.test(t));
   outer: for (const sentence of sentences) {
     const tokens = sentence.split(/\s+/);
     for (let i = 0; i < tokens.length; i++) {
@@ -159,6 +163,7 @@ export function briefDescription(
       if (FILLER.has(w) || WHEN.has(w) || WHEN.has(s) || shown.has(w) || shown.has(s) || used.has(s)) continue;
       // Bare numbers, times and time ranges (7pm, 7:30, 3:00-4:30pm), dates (5th) and years.
       if (/^\d+([:.]\d+)?(am|pm|st|nd|rd|th|s)?$/.test(w) || /\d:\d|\d\s*(am|pm)\b/.test(w)) continue;
+      if (w.length > 4 && w.endsWith("ly") && w !== "family") continue; // adverbs
       used.add(s);
       let word = raw.replace(/^[^\p{L}\p{N}$]+|[^\p{L}\p{N}%+]+$/gu, "");
       // A capital that only marks a sentence start goes; names and acronyms (mid-sentence caps) stay.
@@ -167,8 +172,7 @@ export function briefDescription(
       if (out.length >= max) break outer;
     }
   }
-  if (out.length) out[0] = out[0].charAt(0).toUpperCase() + out[0].slice(1);
-  return out.length >= 2 ? out.join(" ") : "";
+  return out.length >= 2 ? out : [];
 }
 
 /** A date range spanning days (an exhibit, a play's run, "photos with Santa through Dec 24"). */
