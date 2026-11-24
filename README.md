@@ -582,6 +582,10 @@ tapped. Subscribers live in `afoot.email_subscribers` (migration `20261125000000
   (a sample for all of LA if that address hasn't signed up).
 - `npm run weekly-email` sends to everyone confirmed. Picks are the next 7 days by `traffic_score`, one card
   per venue, 3 per day, 15 max. Needs `RESEND_API_KEY` (and `WEEKLY_EMAIL_FROM` if not miguel@somedude.app).
+- Card lines: each card's one line is written in Miguel's voice by Claude (Sonnet) from the listing,
+  facts only (`lib/voice.ts`, picked as "Way 2: rewrite" in `npm run voice:lab`). `npm run voice-lines`
+  fills in new or changed events (nightly, after the rank); `-- --all` rewrites every line after you edit
+  the voice notes. Cards without a line fall back to the keyword gist.
 - `.github/workflows/weekly-email.yml` sends it Thursday ~7 a.m. LA; anyone sent to in the last 5 days is
   skipped, so reruns don't double-send. Run it by hand from the Actions tab ("to" = one test address).
 

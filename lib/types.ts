@@ -32,6 +32,8 @@ export interface NearbyEvent {
   last_occurrence_date?: string | null;
   /** Short line shown instead of the description on phones (see ExtractedEvent.tagline). */
   tagline?: string | null;
+  /** The card's one line in Miguel's voice, written by Claude from the listing (lib/voice.ts). */
+  voice_line?: string | null;
   /** Short schedule under the time ("Weekdays"); see ExtractedEvent.schedule_label. */
   schedule_label?: string | null;
   /** Other showings the same day, folded into this card ("+2 more times"). */

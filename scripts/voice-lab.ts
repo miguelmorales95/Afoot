@@ -14,22 +14,12 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { supabase } from "../lib/supabase";
 import { completeJson, jsonObject } from "../lib/llm";
+import { VOICE, VOICE_RULES } from "../lib/voice";
 import { briefWords, formatTime } from "../lib/format";
 import { INDIE_BOOST, venueScene, type Scene } from "../lib/rank";
 
-// How he writes, distilled from his own messages (Nov 2026). Used only for the AI versions.
-export const VOICE = `How Miguel writes (he runs Light Pole alone, LA local, not a writer):
-- Like texting a friend: plain, direct, a little casual ("kinda", "pretty much", "honestly").
-- Says what the thing is and why you'd go, then stops. Short.
-- Honest and a bit self-aware; jokes at his own expense, never at the event's.
-- No hype or marketing words (amazing, unforgettable, vibes, don't miss, curated).
-- "lol" is rare: at most one in five lines.`;
-
-const RULES = `Hard rules:
-- Use only facts from the listing. Never invent prices, lineups, crowd, or what it's like.
-- Never claim Miguel has been there, knows the people, or recommends it personally.
-- Don't repeat the title, venue, date, time or price (the card shows them).
-- No emoji, no hashtags.`;
+// The voice notes and rules live in lib/voice.ts (the live card lines use the same ones).
+const RULES = VOICE_RULES;
 
 const DAY = 864e5;
 const BOOST_LIVE = Date.parse("2026-11-25T00:00:00Z");

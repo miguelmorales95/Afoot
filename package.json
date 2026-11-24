@@ -35,6 +35,7 @@
     "venue-parking": "tsx scripts/venue-parking.ts",
     "digest": "tsx scripts/digest.ts",
     "rank": "tsx scripts/rank.ts",
+    "voice-lines": "tsx scripts/voice-lines.ts",
     "weekly-email": "tsx scripts/weekly-email.ts",
     "rank:lab": "tsx scripts/rank-lab.ts",
     "voice:lab": "tsx scripts/voice-lab.ts"

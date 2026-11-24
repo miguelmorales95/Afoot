@@ -836,14 +836,15 @@ const EventCard = memo(function EventCard({ ev, feedback, featured, paper, wide,
         {(ev.cancelled || !!ev.uncertain_fields?.length) && (
           <div className="mt-1.5 flex flex-wrap gap-1"><UnconfirmedBadges ev={ev} /></div>
         )}
-        {ev.description && !compact && (
+        {ev.voice_line && !compact && <VoiceLine line={ev.voice_line} />}
+        {ev.description && !ev.voice_line && !compact && (
           <div className="hidden sm:block">
             <p className="mt-1.5 line-clamp-2 text-[15px] font-medium leading-snug text-black/85">{ev.description}</p>
           </div>
         )}
         {/* Phones: keywords pulled from the listing, set like a poster's small print, and labeled
             as what they are: an auto-pulled gist, not a write-up. */}
-        {keywords.length > 0 && !compact && <GistLine words={keywords} />}
+        {keywords.length > 0 && !ev.voice_line && !compact && <GistLine words={keywords} />}
         {((!!ev.tags?.length && !compact) || parking) && (
           <div className="mt-2 flex flex-wrap gap-1">
             {/* Only when we know; otherwise assume street parking. */}
@@ -886,6 +887,32 @@ const EventCard = memo(function EventCard({ ev, feedback, featured, paper, wide,
     body
   );
 });
+
+/** The card's line in Miguel's voice, with the same stamp, and an honest note when tapped. */
+function VoiceLine({ line }: { line: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-1.5">
+      <p className="text-[15px] font-bold leading-snug text-black/90">
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-label="Who wrote this?"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen((o) => !o); }}
+          className="mr-1.5 inline-block rounded-[3px] border-[1.5px] border-black/60 px-1 align-[2px] text-[10px] font-extrabold uppercase leading-[14px] tracking-[0.12em] text-black/70"
+        >
+          Gist
+        </button>
+        {line}
+      </p>
+      {open && (
+        <p className="mt-1 text-[12px] font-semibold leading-snug text-black/70">
+          A robot wrote this from the event&apos;s listing, trying to sound like Miguel. It&apos;s the gist, not a review: Light Pole is one dude covering all of LA, so tap through for the details.
+        </p>
+      )}
+    </div>
+  );
+}
 
 /** The auto-pulled keywords, with a "GIST" stamp that says, when tapped, where they came from. */
 function GistLine({ words }: { words: string[] }) {
