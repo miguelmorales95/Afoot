@@ -113,6 +113,9 @@ const WHEN = new Set(
     "monday tuesday wednesday thursday friday saturday sunday mon tue tues wed thu thur thurs fri sat sun").split(" "),
 );
 
+// A sentence that describes the listing rather than the event.
+const LISTING_NOTE = /\b(isn'?t|is not|not|aren'?t|wasn'?t)\s+(listed|given|provided|posted|shown|available|specified|confirmed)\b|\bdefault\b|\b(check|confirm) (the|with|their|its)\b|\b(tba|tbd)\b/i;
+
 const norm = (w: string) => w.toLowerCase().replace(/[\u2018\u2019]/g, "'").replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, "");
 const stem = (w: string) => w.replace(/'s$/, "").replace(/(?<=..)s$/, "");
 const wordsOf = (s: string | null | undefined) =>
@@ -144,17 +147,27 @@ export function briefDescription(
 
   const out: string[] = [];
   const used = new Set<string>();
-  for (const raw of ev.description.split(/\s+/)) {
-    const w = norm(raw);
-    if (!w) continue;
-    const s = stem(w);
-    if (FILLER.has(w) || WHEN.has(w) || WHEN.has(s) || shown.has(w) || shown.has(s) || used.has(s)) continue;
-    // Bare numbers, times and time ranges (7pm, 7:30, 3:00-4:30pm), dates (5th) and years.
-    if (/^\d+([:.]\d+)?(am|pm|st|nd|rd|th|s)?$/.test(w) || /\d:\d|\d\s*(am|pm)\b/.test(w)) continue;
-    used.add(s);
-    out.push(raw.replace(/^[^\p{L}\p{N}$]+|[^\p{L}\p{N}%+]+$/gu, ""));
-    if (out.length >= max) break;
+  // Sentences about the listing itself ("Start time isn't listed, so the default is used").
+  const sentences = ev.description.split(/(?<=[.!?])\s+/).filter((t) => !LISTING_NOTE.test(t));
+  outer: for (const sentence of sentences) {
+    const tokens = sentence.split(/\s+/);
+    for (let i = 0; i < tokens.length; i++) {
+      const raw = tokens[i];
+      const w = norm(raw);
+      if (!w) continue;
+      const s = stem(w);
+      if (FILLER.has(w) || WHEN.has(w) || WHEN.has(s) || shown.has(w) || shown.has(s) || used.has(s)) continue;
+      // Bare numbers, times and time ranges (7pm, 7:30, 3:00-4:30pm), dates (5th) and years.
+      if (/^\d+([:.]\d+)?(am|pm|st|nd|rd|th|s)?$/.test(w) || /\d:\d|\d\s*(am|pm)\b/.test(w)) continue;
+      used.add(s);
+      let word = raw.replace(/^[^\p{L}\p{N}$]+|[^\p{L}\p{N}%+]+$/gu, "");
+      // A capital that only marks a sentence start goes; names and acronyms (mid-sentence caps) stay.
+      if (i === 0 && /^\p{Lu}\p{Ll}/u.test(word)) word = word.toLowerCase();
+      out.push(word);
+      if (out.length >= max) break outer;
+    }
   }
+  if (out.length) out[0] = out[0].charAt(0).toUpperCase() + out[0].slice(1);
   return out.length >= 2 ? out.join(" ") : "";
 }
 
