@@ -29,6 +29,8 @@ export interface NearbyEvent {
   ends_at: string | null;
   /** Last occurrence date for recurring events, used to show "Until DATE" */
   last_occurrence_date?: string | null;
+  /** Short line shown instead of the description on phones (see ExtractedEvent.tagline). */
+  tagline?: string | null;
   /** Other showings the same day, folded into this card ("+2 more times"). */
   occurrence_count_remaining?: number;
   venue_id: string;
@@ -119,6 +121,8 @@ export interface ExtractedEvent {
   is_recurring: boolean;
   /** Short vibe/activity tags, e.g. ["outdoor", "chill", "live band"]. */
   tags: string[];
+  /** Under 10 words saying what it is, never repeating title/venue/date/price. Shown on phones. */
+  tagline?: string | null;
   /** Concrete upcoming date/times, already expanded from any recurrence. */
   occurrences: { start: string; end: string | null }[];
 }

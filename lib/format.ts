@@ -161,3 +161,12 @@ export function briefDescription(
 /** A date range spanning days (an exhibit, a play's run, "photos with Santa through Dec 24"). */
 export const isRun = (o: { starts_at: string; ends_at: string | null }) =>
   !!o.ends_at && Date.parse(o.ends_at) - Date.parse(o.starts_at) > 26 * 3600 * 1000;
+
+/** True when most of a tagline's meaningful words are already in the title or venue name. */
+export function repeatsCard(tagline: string, ev: { title: string; venue_name?: string | null }): boolean {
+  const shown = new Set([...wordsOf(ev.title), ...wordsOf(ev.venue_name)].flatMap((w) => [w, stem(w)]));
+  const words = wordsOf(tagline).filter((w) => !FILLER.has(w) && !/^\d+$/.test(w));
+  if (!words.length) return true;
+  const repeated = words.filter((w) => shown.has(w) || shown.has(stem(w))).length;
+  return repeated / words.length >= 0.6;
+}

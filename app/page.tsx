@@ -631,7 +631,7 @@ function EventCard({ ev, feedback, featured, paper }: { ev: NearbyEvent; feedbac
   const onTap = () => countClick(ev.event_id);
   const look = flyerLook(ev.event_id, paper);
   const more = ev.occurrence_count_remaining ?? 0;
-  const brief = useMemo(() => briefDescription(ev), [ev]);
+  const brief = useMemo(() => ev.tagline || briefDescription(ev), [ev]);
   const body = (
     <div ref={cardRef} className="flyer flex gap-3 px-4 pb-6 pt-6 sm:gap-4" style={look}>
       <div className="flex w-[104px] shrink-0 flex-col gap-2 sm:w-32">

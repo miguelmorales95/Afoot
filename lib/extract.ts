@@ -1,5 +1,6 @@
 import { complete, extractJson } from "./llm";
 import type { ExtractedEvent } from "./types";
+import { repeatsCard } from "./format";
 
 // Turn messy venue page text into structured events using an LLM.
 //
@@ -39,6 +40,12 @@ seated, standing, "food available", "dog-friendly", date-night, solo-friendly, h
 Do NOT use the category itself as a tag, and don't invent marketing phrases. Omit tags you
 can't infer from the text rather than guessing.
 
+tagline: at most 9 words that tell someone scrolling on a phone what this actually is or what
+they'll do there, e.g. "Six local artists, photography and mixed media" or "Teams compete,
+prizes for the top three". The card already shows the title, venue, neighborhood, date, time,
+price and tags, so NEVER repeat any of those. No marketing words (amazing, unforgettable,
+don't miss), no "join us". Use null if the text gives nothing beyond what the card shows.
+
 Respond with a single JSON object and NOTHING else:
 {"events": [ {
   "title": string,
@@ -49,6 +56,7 @@ Respond with a single JSON object and NOTHING else:
   "recurrence_description": string | null,
   "is_recurring": boolean,
   "tags": string[],                 // 2-5 vibe/activity tags, or []
+  "tagline": string | null,         // <= 9 words, nothing the card already shows
   "occurrences": [ { "start": string, "end": string | null } ]
 } ] }
 
@@ -111,6 +119,7 @@ export async function extractEvents(
     )
     .map((e) => ({
       ...e,
+      tagline: ((t) => (t && !repeatsCard(t, { title: e.title, venue_name: input.venueName }) ? t : null))(cleanTagline(e.tagline)),
       tags: Array.isArray(e.tags)
         ? e.tags
             .filter((t): t is string => typeof t === "string")
@@ -119,6 +128,14 @@ export async function extractEvents(
             .slice(0, 6)
         : [],
     }));
+}
+
+/** A tagline as the card shows it: trimmed, no closing period, null if missing or over 12 words. */
+export function cleanTagline(t: unknown): string | null {
+  if (typeof t !== "string") return null;
+  const s = t.trim().replace(/^["'“]+|["'”]+$/g, "").replace(/\.$/, "").trim();
+  const words = s.split(/\s+/).filter(Boolean).length;
+  return words >= 2 && words <= 12 ? s : null;
 }
 
 /** The whole event objects in an "events" array whose JSON was cut off partway. */

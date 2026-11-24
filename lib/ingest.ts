@@ -134,6 +134,8 @@ export async function storeExtractedEvents(opts: {
           recurrence_description: ev.recurrence_description,
           is_recurring: !!ev.is_recurring,
           tags: ev.tags ?? [],
+          // Only when there is one, so a re-import without a tagline keeps the saved one.
+          ...(ev.tagline ? { tagline: ev.tagline } : {}),
           source: opts.source,
           dedupe_key: dedupeKey,
           updated_at: new Date().toISOString(),
