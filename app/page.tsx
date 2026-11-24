@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import type { NearbyEvent } from "@/lib/types";
 import {
   briefWords,
+  parkingStatus,
   categoryMeta,
   dayKey,
   formatDayLabel,
@@ -597,6 +598,7 @@ function EventCard({ ev, feedback, featured, paper }: { ev: NearbyEvent; feedbac
   const look = flyerLook(ev.event_id, paper);
   const more = ev.occurrence_count_remaining ?? 0;
   const keywords = useMemo(() => briefWords(ev), [ev]);
+  const parking = parkingStatus(ev);
   const body = (
     <div ref={cardRef} className="flyer flex gap-3 px-4 pb-6 pt-6 sm:gap-4" style={look}>
       <div className="flex w-[104px] shrink-0 flex-col gap-2 sm:w-32">
@@ -618,6 +620,9 @@ function EventCard({ ev, feedback, featured, paper }: { ev: NearbyEvent; feedbac
             </>
           )}
         </time>
+        {ev.is_recurring && ev.recurrence_description && (
+          <p className="text-center text-[11px] font-bold leading-tight text-black/80">🔁 {ev.recurrence_description}</p>
+        )}
         <VenueMiniMap lat={ev.venue_lat} lng={ev.venue_lng} venue={ev.venue_name} />
       </div>
       <div className="min-w-0 flex-1">
@@ -647,12 +652,8 @@ function EventCard({ ev, feedback, featured, paper }: { ev: NearbyEvent; feedbac
             Until {formatShortDate(ev.last_occurrence_date)}
           </p>
         )}
-        {(ev.venue_parking || ev.venue_good_to_know) && (
-          <p className="mt-0.5 text-sm font-medium text-black/80">
-            {ev.venue_parking ? `🅿️ ${ev.venue_parking}` : ""}
-            {ev.venue_parking && ev.venue_good_to_know ? " · " : ""}
-            {ev.venue_good_to_know ? `ℹ️ ${ev.venue_good_to_know}` : ""}
-          </p>
+        {ev.venue_good_to_know && (
+          <p className="mt-0.5 text-sm font-medium text-black/80">ℹ️ {ev.venue_good_to_know}</p>
         )}
         {(ev.cancelled || !!ev.uncertain_fields?.length) && (
           <div className="mt-1.5 flex flex-wrap gap-1"><UnconfirmedBadges ev={ev} /></div>
@@ -667,23 +668,31 @@ function EventCard({ ev, feedback, featured, paper }: { ev: NearbyEvent; feedbac
           <p className="mt-1.5 flex flex-wrap gap-x-1.5 gap-y-0.5 text-[13px] font-extrabold uppercase leading-snug tracking-[0.08em] text-black/85 sm:hidden">
             {keywords.map((w, i) => (
               <span key={w}>
-                {i > 0 && <span aria-hidden className="mr-1.5 opacity-40">·</span>}
                 {w}
+                {i < keywords.length - 1 && <span aria-hidden className="ml-1.5 opacity-40">·</span>}
               </span>
             ))}
           </p>
         )}
-        {ev.tags && ev.tags.length > 0 && (
+        {(!!ev.tags?.length || parking) && (
           <div className="mt-2 flex flex-wrap gap-1">
-            {ev.tags.slice(0, 4).map((t) => (
+            {/* Only when we know; otherwise assume street parking. */}
+            {parking && (
+              <span
+                title={ev.venue_parking ?? (parking === "no-parking" ? "Visitors say it's hard to park" : undefined)}
+                className={`rounded-full px-2 py-0.5 text-xs font-extrabold ${
+                  parking === "parking" ? "bg-[#111] text-[var(--paper)]" : "border-[1.5px] border-dashed border-[#111] text-[#111]"
+                }`}
+              >
+                {parking === "parking" ? "🅿️ Parking" : "No Parking"}
+              </span>
+            )}
+            {(ev.tags ?? []).slice(0, 4).map((t) => (
               <span key={t} className="rounded-full border-[1.5px] border-[#111]/70 px-2 py-0.5 text-xs font-bold text-[#111]">
                 {t}
               </span>
             ))}
           </div>
-        )}
-        {ev.is_recurring && ev.recurrence_description && (
-          <p className="mt-1.5 text-sm font-semibold text-black/80">🔁 {ev.recurrence_description}</p>
         )}
         <EventFeedback ev={ev} enabled={feedback} lead={<GoingButton ev={ev} compact />} />
       </div>

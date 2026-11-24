@@ -96,7 +96,7 @@ const FILLER = new Set(
     "is are was were be been being will would can could may might shall should must do does did has have had " +
     "also just very more most all any each every some no not there here then now plus etc " +
     "event events held hosted host hosts join come enjoy featuring feature features presents presented " +
-    "nothing something everything anything one " +
+    "nothing something everything anything one own other others another such same " +
     // Generic verbs and question words: they read as noise once pulled out of a sentence.
     "bring brings make makes made get gets take takes spend spends invite invites play plays test chat stay stayed " +
     "matter matters learn see watch offer offers include includes including welcome welcomes encouraged available " +
@@ -186,4 +186,17 @@ export function repeatsCard(tagline: string, ev: { title: string; venue_name?: s
   if (!words.length) return true;
   const repeated = words.filter((w) => shown.has(w) || shown.has(stem(w))).length;
   return repeated / words.length >= 0.6;
+}
+
+/**
+ * Whether we know there's parking: "parking" when the venue's note mentions a lot, garage,
+ * valet or free parking; "no-parking" when it says there's none (or street only), or when two
+ * or more people tipped "hard to park". Null when we don't know (assume street parking).
+ */
+export function parkingStatus(ev: { venue_parking?: string | null; heads_up?: Partial<Record<string, number>> }): "parking" | "no-parking" | null {
+  const note = ev.venue_parking ?? "";
+  if (/\bno (on-?site |dedicated |free )?parking\b|\bstreet (parking )?only\b|\bno (parking )?lot\b/i.test(note)) return "no-parking";
+  if (/\b(lot|garage|structure|valet|free parking|parking (available|on-?site))\b/i.test(note)) return "parking";
+  if ((ev.heads_up?.parking ?? 0) >= 2) return "no-parking";
+  return null;
 }
