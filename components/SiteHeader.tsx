@@ -13,7 +13,7 @@ export default function SiteHeader() {
           <StapleGun />
           <span className="sr-only">Light Pole</span>
           <span className="font-poster text-[26px] uppercase leading-none" aria-hidden>
-            <span className="text-[#fff23a]">Ligh<PoleT /></span> <span className="text-[#ff5fae]">Pole</span>
+            <span className="text-[#fff23a]">Light</span> <span className="text-[#ff5fae]">Pole</span>
           </span>
         </Link>
         <nav className="flex items-center gap-2 text-sm text-white/70">
@@ -36,41 +36,26 @@ export default function SiteHeader() {
   );
 }
 
-/** Side view of a staple gun firing a staple: how flyers actually go up on a pole. */
+/** A D-handle staple gun pressed flat against a pole, a staple going in at the nose. */
 function StapleGun() {
   return (
-    <svg viewBox="0 0 44 33" className="h-7 w-auto shrink-0" aria-hidden>
-      {/* grip lever, hinged at the front, rear end raised */}
-      <path d="M7 8.6 L38.6 2.2 Q42.4 1.6 42.4 5.2 V7.4 Q42.4 10.2 39.6 10.7 L15 15.4 Q11 16 9.6 13.4 Z" fill="#ff5fae" />
-      {/* front head and magazine */}
-      <path d="M2.5 8.5 Q2.5 7 4 7 H13 Q14.5 7 14.5 8.5 V17 H40 Q42 17 42 19 V22.5 Q42 24.5 40 24.5 H2.5 Z" fill="#d9dde1" />
-      <rect x="5" y="19" width="34" height="1.3" rx="0.6" fill="#fff" opacity="0.7" />
-      <circle cx="10.5" cy="11" r="1.7" fill="#2b2119" />
-      {/* nose and a staple on its way out */}
-      <rect x="2.5" y="24.5" width="7" height="2" fill="#9aa1a8" />
-      <path d="M3.6 30.2 V27.8 H8.4 V30.2" fill="none" stroke="#fff23a" strokeWidth="1.4" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-/** The T of LIGHT drawn as an LA wooden power pole: crossarm with insulators, braces, transformer can. */
-function PoleT() {
-  return (
-    <svg viewBox="0 0 22 34" fill="currentColor" className="ml-[0.02em] inline-block h-[0.86em] w-auto align-baseline">
-      {/* insulators on the crossarm, and one on the pole top */}
-      <rect x="1" y="1.4" width="2.2" height="4" rx="1.1" />
-      <rect x="18.8" y="1.4" width="2.2" height="4" rx="1.1" />
-      <rect x="9.9" y="0" width="2.2" height="5" rx="1.1" />
-      {/* crossarm */}
-      <rect x="0" y="4.8" width="22" height="5" rx="0.5" />
-      {/* tapered pole */}
-      <path d="M8.6 3 L13.4 3 L14.2 34 L7.8 34 Z" />
-      {/* braces under the crossarm */}
-      <path d="M3.6 9.4 L8.6 15.4" stroke="currentColor" strokeWidth="2.2" fill="none" />
-      <path d="M18.4 9.4 L13.4 15.4" stroke="currentColor" strokeWidth="2.2" fill="none" />
-      {/* transformer can */}
-      <rect x="14.6" y="17" width="6" height="8.6" rx="2" />
-      <rect x="13.4" y="18.6" width="1.8" height="1.6" />
+    <svg viewBox="0 0 34 36" className="h-8 w-auto shrink-0" aria-hidden>
+      {/* the pole */}
+      <rect x="0" y="0" width="5" height="36" rx="1" fill="#7a5636" />
+      {/* body: flat side against the pole, nose at the bottom */}
+      <rect x="5.5" y="2" width="9" height="32" rx="2" fill="#d9dde1" />
+      <rect x="7.4" y="5" width="1.3" height="20" rx="0.6" fill="#fff" opacity="0.75" />
+      <rect x="5.5" y="27" width="9" height="7" rx="1.5" fill="#9aa1a8" />
+      {/* D-handle: an angled squeeze grip looping back to the body, with the hand hole */}
+      <path
+        fillRule="evenodd"
+        fill="#ff5fae"
+        d="M14 2.5 L24 3 Q33.5 4 32.4 13 L30.6 23.5 Q29.8 28.4 25 27.2 L14 23.5 Z M15.6 8 L23.2 8.5 Q27.6 9.4 26.9 13.6 L25.6 20.2 Q25 22.8 22.6 22 L15.6 19 Z"
+      />
+      {/* finger ridges on the grip */}
+      <path d="M31.2 11 H33 M30.8 14.5 H32.6 M30.2 18 H32 M29.6 21.5 H31.4" stroke="#2b2119" strokeWidth="1" strokeLinecap="round" />
+      {/* a staple going into the pole */}
+      <path d="M6.2 29.2 H2.6 V33.6 H6.2" fill="none" stroke="#fff23a" strokeWidth="1.4" strokeLinejoin="round" />
     </svg>
   );
 }
