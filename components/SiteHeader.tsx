@@ -36,26 +36,31 @@ export default function SiteHeader() {
   );
 }
 
-/** A D-handle staple gun pressed flat against a pole, a staple going in at the nose. */
+/** A silver staple gun, side view: plunger cap, front head, squeeze lever, slot in the base. */
 function StapleGun() {
   return (
-    <svg viewBox="0 0 34 36" className="h-8 w-auto shrink-0" aria-hidden>
-      {/* the pole */}
-      <rect x="0" y="0" width="5" height="36" rx="1" fill="#7a5636" />
-      {/* body: flat side against the pole, nose at the bottom */}
-      <rect x="5.5" y="2" width="9" height="32" rx="2" fill="#d9dde1" />
-      <rect x="7.4" y="5" width="1.3" height="20" rx="0.6" fill="#fff" opacity="0.75" />
-      <rect x="5.5" y="27" width="9" height="7" rx="1.5" fill="#9aa1a8" />
-      {/* D-handle: an angled squeeze grip looping back to the body, with the hand hole */}
-      <path
-        fillRule="evenodd"
-        fill="#ff5fae"
-        d="M14 2.5 L24 3 Q33.5 4 32.4 13 L30.6 23.5 Q29.8 28.4 25 27.2 L14 23.5 Z M15.6 8 L23.2 8.5 Q27.6 9.4 26.9 13.6 L25.6 20.2 Q25 22.8 22.6 22 L15.6 19 Z"
-      />
-      {/* finger ridges on the grip */}
-      <path d="M31.2 11 H33 M30.8 14.5 H32.6 M30.2 18 H32 M29.6 21.5 H31.4" stroke="#2b2119" strokeWidth="1" strokeLinecap="round" />
-      {/* a staple going into the pole */}
-      <path d="M6.2 29.2 H2.6 V33.6 H6.2" fill="none" stroke="#fff23a" strokeWidth="1.4" strokeLinejoin="round" />
+    <svg viewBox="0 0 50 46" className="h-8 w-auto shrink-0" aria-hidden>
+      <defs>
+        <linearGradient id="steel" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#f4f6f8" />
+          <stop offset="0.55" stopColor="#c9ced4" />
+          <stop offset="1" stopColor="#8e959c" />
+        </linearGradient>
+      </defs>
+      <g stroke="#3a3f45" strokeWidth="1.6" strokeLinejoin="round">
+        {/* squeeze lever */}
+        <path d="M23 19.5 L44.6 4.4 Q48.4 2.6 47.6 6.6 Q45.4 13.6 39.4 18 Q34.4 21.6 30.6 25 Z" fill="#b9bfc6" />
+        {/* plunger cap */}
+        <rect x="7.4" y="7" width="2.8" height="7" fill="url(#steel)" />
+        <rect x="12.6" y="7" width="2.8" height="7" fill="url(#steel)" />
+        <rect x="5" y="4.6" width="13" height="3" rx="1.5" fill="url(#steel)" />
+        {/* body and front head */}
+        <path d="M4 14 H18.5 V16.4 Q25.6 16.6 29.4 21.8 L31.2 25.4 Q31.8 27 33.6 27 H42 Q47.2 27 47.2 32.4 V44.4 H4 Z" fill="url(#steel)" />
+        <path d="M18.5 16.4 V31" fill="none" />
+      </g>
+      {/* pivot and the slot in the base */}
+      <circle cx="21.6" cy="23.4" r="2.2" fill="#3a3f45" />
+      <rect x="23" y="33.4" width="18.6" height="4.6" rx="2.3" fill="#3a3f45" />
     </svg>
   );
 }
