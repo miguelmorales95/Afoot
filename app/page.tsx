@@ -218,6 +218,15 @@ export default function Home() {
 
   // Each day shows its top 15; the button adds 15, then 15 more, then shows the rest.
   const [shown, setShown] = useState<Record<string, number>>({});
+  // Lineup cards (several shows at one venue that day) the reader has opened into their own cards.
+  const [openLineups, setOpenLineups] = useState<Set<string>>(new Set());
+  const toggleLineup = (id: string) =>
+    setOpenLineups((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   useEffect(() => setShown({}), [events, types]);
 
   const scrollToControls = () =>
@@ -474,9 +483,10 @@ export default function Home() {
       {!loading &&
         view === "list" &&
         grouped.map(([key, dayEvents], di) => {
+          const items = lineupItems(dayEvents);
           const limit = shown[key] ?? PAGE;
-          const hidden = dayEvents.length - limit;
-          const colors = posterColors(dayEvents.slice(0, limit));
+          const hidden = items.length - limit;
+          const colors = posterColors(items.slice(0, limit).map((it) => (it.kind === "one" ? it.ev : it.evs[0])));
           return (
             <div key={key} id={`day-${key}`} className="mb-8 scroll-mt-14">
               <div className="sticky top-14 z-10 -mx-4 flex items-center justify-between gap-3 bg-[#2b2119]/95 px-4 py-2 backdrop-blur">
@@ -510,16 +520,27 @@ export default function Home() {
                 </div>
               </div>
               <div className="flyer-stack mt-2">
-                {dayEvents.slice(0, limit).map((ev, i) => (
-                  <EventCard key={ev.occurrence_id} ev={ev} feedback={feedback} paper={colors[i]} wide={!!loc?.all} />
-                ))}
+                {items.slice(0, limit).flatMap((it, i) => {
+                  if (it.kind === "one") return [<EventCard key={it.ev.occurrence_id} ev={it.ev} feedback={feedback} paper={colors[i]} wide={!!loc?.all} />];
+                  const id = `${key}|${it.key}`;
+                  const open = openLineups.has(id);
+                  const base = PAPER.indexOf(colors[i]);
+                  return [
+                    <LineupCard key={id} evs={it.evs} paper={colors[i]} wide={!!loc?.all} open={open} onToggle={() => toggleLineup(id)} />,
+                    ...(open
+                      ? it.evs.map((ev, j) => (
+                          <EventCard key={ev.occurrence_id} ev={ev} feedback={feedback} paper={PAPER[(base + j + 1) % PAPER.length]} wide={!!loc?.all} />
+                        ))
+                      : []),
+                  ];
+                })}
               </div>
               {hidden > 0 && (
                 <button
                   onClick={() => setShown((s) => ({ ...s, [key]: limit >= PAGE * 3 ? Infinity : limit + PAGE }))}
                   className="mt-4 w-full rounded-full border-2 border-white/20 px-4 py-3 text-sm font-extrabold uppercase tracking-wide text-white/85 hover:border-white/40 hover:text-white"
                 >
-                  {limit >= PAGE * 3 ? `Show all ${dayEvents.length}` : `Show ${Math.min(PAGE, hidden)} more`}
+                  {limit >= PAGE * 3 ? `Show all ${items.length}` : `Show ${Math.min(PAGE, hidden)} more`}
                   <span className="ml-2 font-bold normal-case tracking-normal text-white/45">{hidden} not shown</span>
                 </button>
               )}
@@ -769,6 +790,90 @@ function EventCard({ ev, feedback, featured, paper, wide }: { ev: NearbyEvent; f
     </a>
   ) : (
     body
+  );
+}
+
+type DayItem = { kind: "one"; ev: NearbyEvent } | { kind: "lineup"; key: string; evs: NearbyEvent[] };
+
+/**
+ * A day's cards: events of the same type at the same venue (four comedy shows at one club) become
+ * one lineup card, placed where the venue's best-ranked show would be. Runs that started earlier
+ * ("Until Dec 24") stay on their own.
+ */
+function lineupItems(evs: NearbyEvent[]): DayItem[] {
+  const groupKey = (ev: NearbyEvent) => (startedBefore(ev) ? `solo:${ev.occurrence_id}` : `${ev.venue_id}|${ev.category ?? "other"}`);
+  const groups = new Map<string, NearbyEvent[]>();
+  for (const ev of evs) (groups.get(groupKey(ev)) ?? groups.set(groupKey(ev), []).get(groupKey(ev))!).push(ev);
+  const out: DayItem[] = [];
+  const placed = new Set<string>();
+  for (const ev of evs) {
+    const k = groupKey(ev);
+    if (placed.has(k)) continue;
+    placed.add(k);
+    const g = groups.get(k)!;
+    out.push(g.length >= 2 ? { kind: "lineup", key: k, evs: [...g].sort((a, b) => a.starts_at.localeCompare(b.starts_at)) } : { kind: "one", ev });
+  }
+  return out;
+}
+
+/** Several shows at one venue that day, set like a club's flyer: venue on top, then the lineup. */
+function LineupCard({ evs, paper, wide, open, onToggle }: { evs: NearbyEvent[]; paper?: string; wide?: boolean; open: boolean; onToggle: () => void }) {
+  const first = evs[0];
+  const cat = categoryMeta(first.category);
+  const parking = parkingStatus(first);
+  const [mapOpen, setMapOpen] = useState(false);
+  const closeMap = useCallback(() => setMapOpen(false), []);
+  const SHOWN = 6;
+  return (
+    <div className="flyer flex gap-3 px-4 pb-6 pt-6 sm:gap-4" style={flyerLook(first.venue_id, paper)}>
+      <div className="flex w-[104px] shrink-0 flex-col gap-2 sm:w-32">
+        <div className="font-poster rounded-sm bg-[#111] px-1 py-1.5 text-center leading-none" style={{ color: "var(--paper)" }}>
+          <span className="block text-[23px] uppercase">{evs.length} shows</span>
+          <span className="mt-1 block text-[13px]">from {formatTime(first.starts_at)}</span>
+        </div>
+        <button
+          type="button"
+          aria-label={`Bigger map of ${first.venue_name}`}
+          onClick={() => setMapOpen(true)}
+          className="block w-full cursor-zoom-in"
+        >
+          <VenueMiniMap lat={first.venue_lat} lng={first.venue_lng} venue={first.venue_name} />
+        </button>
+        {mapOpen && <VenueMapModal ev={first} onClose={closeMap} />}
+      </div>
+      <div className="min-w-0 flex-1">
+        <span className="inline-block rounded-full border-2 border-[#111] px-2 py-0.5 text-[11px] font-extrabold uppercase tracking-wide text-[#111]">
+          {cat.emoji} {cat.label}
+        </span>
+        <h3 className="font-poster mt-1.5 text-[26px] leading-[1.03] text-[#111] sm:text-[30px]">{first.venue_name}</h3>
+        {!wide && <p className="mt-1 text-[15px] font-bold text-[#111]">{formatDistance(first.distance_km)} away</p>}
+        <ul className="mt-2 space-y-1">
+          {evs.slice(0, SHOWN).map((ev) => (
+            <li key={ev.occurrence_id} className="flex gap-2 text-[15px] font-bold leading-snug text-[#111]">
+              <span className="font-poster w-[62px] shrink-0 text-[16px]">{formatTime(ev.starts_at)}</span>
+              {ev.url ? (
+                <a href={ev.url} target="_blank" rel="noopener noreferrer" onClick={() => countClick(ev.event_id)} className={`min-w-0 underline-offset-2 hover:underline ${ev.cancelled ? "line-through opacity-60" : ""}`}>
+                  {ev.title}
+                </a>
+              ) : (
+                <span className={`min-w-0 ${ev.cancelled ? "line-through opacity-60" : ""}`}>{ev.title}</span>
+              )}
+            </li>
+          ))}
+          {evs.length > SHOWN && <li className="text-sm font-extrabold text-black/70">+{evs.length - SHOWN} more</li>}
+        </ul>
+        {parking && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            <span className={`rounded-full px-2 py-0.5 text-xs font-extrabold ${parking === "parking" ? "bg-[#111] text-[var(--paper)]" : "border-[1.5px] border-dashed border-[#111] text-[#111]"}`}>
+              {parking === "parking" ? "🅿️ Parking" : "No Parking"}
+            </span>
+          </div>
+        )}
+        <button type="button" onClick={onToggle} aria-expanded={open} className="going-btn mt-3 rounded-full">
+          {open ? "Show less" : `See all ${evs.length} shows`}
+        </button>
+      </div>
+    </div>
   );
 }
 
