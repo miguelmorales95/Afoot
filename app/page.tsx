@@ -529,7 +529,7 @@ export default function Home() {
                     ...(open
                       // Same paper as the lineup card, so the opened shows read as one stack.
                       ? it.evs.map((ev) => (
-                          <EventCard key={ev.occurrence_id} ev={ev} feedback={feedback} paper={colors[i]} wide={!!loc?.all} />
+                          <EventCard key={ev.occurrence_id} ev={ev} feedback={feedback} paper={colors[i]} wide={!!loc?.all} inLineup />
                         ))
                       : []),
                   ];
@@ -609,6 +609,9 @@ export default function Home() {
   );
 }
 
+/** The source gave no start time (the stored time is a placeholder). */
+const timeTba = (ev: NearbyEvent) => !!ev.uncertain_fields?.includes("starts_at");
+
 /** Started on an earlier day and still running (shown under today, with its end date). */
 function startedBefore(ev: NearbyEvent) {
   return dayKey(ev.starts_at) < dayKey(new Date().toISOString());
@@ -656,7 +659,7 @@ function posterColors(evs: NearbyEvent[]): string[] {
 }
 
 /** `wide`: browsing all of LA, where distance from downtown means nothing, so it's left off. */
-function EventCard({ ev, feedback, featured, paper, wide }: { ev: NearbyEvent; feedback: boolean; featured?: LiveCampaign; paper?: string; wide?: boolean }) {
+function EventCard({ ev, feedback, featured, paper, wide, inLineup }: { ev: NearbyEvent; feedback: boolean; featured?: LiveCampaign; paper?: string; wide?: boolean; inLineup?: boolean }) {
   const cat = categoryMeta(ev.category);
   const seenRef = useSeen(featured?.id ?? null);
   // Views and taps feed the traffic ranking (counts only).
@@ -672,6 +675,10 @@ function EventCard({ ev, feedback, featured, paper, wide }: { ev: NearbyEvent; f
   const schedule = scheduleLine(ev, !(startedBefore(ev) && ev.ends_at));
   const [mapOpen, setMapOpen] = useState(false);
   const closeMap = useCallback(() => setMapOpen(false), []);
+  const venueLine = [
+    ...(inLineup ? [] : [ev.venue_name, ...(wide ? [] : [`${formatDistance(ev.distance_km)} away`])]),
+    ...(ev.price ? [`${ev.price_is_usual ? "usually " : ""}${ev.price}`] : []),
+  ].join(" · ");
   const body = (
     <div ref={cardRef} className="flyer flex gap-3 px-4 pb-6 pt-6 sm:gap-4" style={look}>
       <div className="flex w-[104px] shrink-0 flex-col gap-2 sm:w-32">
@@ -688,7 +695,7 @@ function EventCard({ ev, feedback, featured, paper, wide }: { ev: NearbyEvent; f
             </>
           ) : (
             <>
-              <span className="block text-[23px]">{formatTime(ev.starts_at)}</span>
+              <span className="block text-[23px]">{timeTba(ev) ? "TIME TBA" : formatTime(ev.starts_at)}</span>
               {more > 0 && <span className="mt-1 block text-[13px]">+{more} more time{more === 1 ? "" : "s"}</span>}
             </>
           )}
@@ -696,20 +703,25 @@ function EventCard({ ev, feedback, featured, paper, wide }: { ev: NearbyEvent; f
         {schedule && (
           <p className="text-center text-[13px] font-extrabold uppercase leading-tight tracking-wide text-[#111]">{schedule}</p>
         )}
-        <button
-          type="button"
-          aria-label={`Bigger map of ${ev.venue_name}`}
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMapOpen(true); }}
-          className="block w-full cursor-zoom-in"
-        >
-          <VenueMiniMap lat={ev.venue_lat} lng={ev.venue_lng} venue={ev.venue_name} />
-        </button>
+        {/* Under a lineup card the venue, map and type are already shown once above. */}
+        {!inLineup && (
+          <button
+            type="button"
+            aria-label={`Bigger map of ${ev.venue_name}`}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMapOpen(true); }}
+            className="block w-full cursor-zoom-in"
+          >
+            <VenueMiniMap lat={ev.venue_lat} lng={ev.venue_lng} venue={ev.venue_name} />
+          </button>
+        )}
         {mapOpen && <VenueMapModal ev={ev} onClose={closeMap} />}
       </div>
       <div className="min-w-0 flex-1">
-        <span className="inline-block rounded-full border-2 border-[#111] px-2 py-0.5 text-[11px] font-extrabold uppercase tracking-wide text-[#111]">
-          {cat.emoji} {cat.label}
-        </span>
+        {!inLineup && (
+          <span className="inline-block rounded-full border-2 border-[#111] px-2 py-0.5 text-[11px] font-extrabold uppercase tracking-wide text-[#111]">
+            {cat.emoji} {cat.label}
+          </span>
+        )}
         <h3 className={`font-poster mt-1.5 text-[26px] leading-[1.03] text-[#111] sm:text-[30px] ${ev.cancelled ? "line-through opacity-60" : ""}`}>
           {ev.title}
         </h3>
@@ -724,10 +736,7 @@ function EventCard({ ev, feedback, featured, paper, wide }: { ev: NearbyEvent; f
             <WhySponsored className="" />
           </div>
         )}
-        <p className="mt-1 text-[15px] font-bold leading-snug text-[#111]">
-          {ev.venue_name}{wide ? "" : ` · ${formatDistance(ev.distance_km)} away`}
-          {ev.price ? ` · ${ev.price_is_usual ? "usually " : ""}${ev.price}` : ""}
-        </p>
+        {venueLine && <p className="mt-1 text-[15px] font-bold leading-snug text-[#111]">{venueLine}</p>}
         {ev.venue_good_to_know && (
           <p className="mt-0.5 text-sm font-medium text-black/80">ℹ️ {ev.venue_good_to_know}</p>
         )}
@@ -829,7 +838,7 @@ function LineupCard({ evs, paper, wide, open, onToggle }: { evs: NearbyEvent[]; 
       <div className="flex w-[104px] shrink-0 flex-col gap-2 sm:w-32">
         <div className="font-poster rounded-sm bg-[#111] px-1 py-1.5 text-center leading-none" style={{ color: "var(--paper)" }}>
           <span className="block text-[23px] uppercase">{evs.length} shows</span>
-          <span className="mt-1 block text-[13px]">from {formatTime(first.starts_at)}</span>
+          {!timeTba(first) && <span className="mt-1 block text-[13px]">from {formatTime(first.starts_at)}</span>}
         </div>
         <button
           type="button"
@@ -850,7 +859,7 @@ function LineupCard({ evs, paper, wide, open, onToggle }: { evs: NearbyEvent[]; 
         <ul className="mt-2 space-y-1">
           {evs.slice(0, SHOWN).map((ev) => (
             <li key={ev.occurrence_id} className="flex gap-2 text-[15px] font-bold leading-snug text-[#111]">
-              <span className="font-poster w-[62px] shrink-0 text-[16px]">{formatTime(ev.starts_at)}</span>
+              <span className="font-poster w-[62px] shrink-0 text-[16px]">{timeTba(ev) ? "TBA" : formatTime(ev.starts_at)}</span>
               {ev.url ? (
                 <a href={ev.url} target="_blank" rel="noopener noreferrer" onClick={() => countClick(ev.event_id)} className={`min-w-0 underline-offset-2 hover:underline ${ev.cancelled ? "line-through opacity-60" : ""}`}>
                   {ev.title}

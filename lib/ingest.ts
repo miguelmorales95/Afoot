@@ -170,6 +170,8 @@ export async function storeExtractedEvents(opts: {
           // Only when there is one, so a re-import without a tagline keeps the saved one.
           ...(ev.tagline ? { tagline: ev.tagline } : {}),
           ...(ev.schedule_label ? { schedule_label: ev.schedule_label } : {}),
+          // A placeholder time is flagged, so cards say "Time TBA" and visitors are asked to confirm.
+          ...(ev.time_unknown ? { uncertain_fields: ["starts_at"] } : {}),
           source: opts.source,
           dedupe_key: dedupeKey,
           updated_at: new Date().toISOString(),

@@ -28,7 +28,8 @@ For EACH event, expand its schedule into concrete upcoming occurrences:
 
 Times: use the venue's local timezone. Output each occurrence start/end as an ISO 8601
 string WITH the offset, e.g. "2026-03-01T18:00:00-08:00". If no end time is known, use null.
-If a start time is unknown but the date is known, use T19:00:00 (a reasonable evening default).
+If a start time is unknown but the date is known, use T19:00:00 as a placeholder for sorting AND
+set "time_unknown": true on that event, so the site shows "Time TBA" instead of a made-up time.
 
 category must be one of: music, karaoke, trivia, games, comedy, market, food, class, other.
 
@@ -62,6 +63,7 @@ Respond with a single JSON object and NOTHING else:
   "tags": string[],                 // 2-5 vibe/activity tags, or []
   "tagline": string | null,         // <= 9 words, nothing the card already shows
   "schedule_label": string | null,  // recurring only: 1-3 words, e.g. "Weekdays"
+  "time_unknown": boolean,          // true when the start time was not given (placeholder used)
   "occurrences": [ { "start": string, "end": string | null } ]
 } ] }
 

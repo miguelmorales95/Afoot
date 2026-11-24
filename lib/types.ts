@@ -125,6 +125,8 @@ export interface ExtractedEvent {
   tags: string[];
   /** Under 10 words saying what it is, never repeating title/venue/date/price. Shown on phones. */
   tagline?: string | null;
+  /** The page gave no start time; occurrences use a 7 PM placeholder and the card says "Time TBA". */
+  time_unknown?: boolean;
   /** 1-3 words for a recurring schedule ("Weekdays", "Every Tue"). Null for one-offs. */
   schedule_label?: string | null;
   /** Concrete upcoming date/times, already expanded from any recurrence. */
