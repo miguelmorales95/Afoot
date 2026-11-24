@@ -13,6 +13,18 @@ type Phase = "idle" | "reading" | "review" | "adding" | "done";
 type Result = { title: string; ok: boolean; note: string };
 
 // Claude reads ~1 Facebook card a second; keep each call well under the 60 s limit.
+// Where somedudes look for events we don't get on our own: sites with no API (or a paid one).
+// LA pages where the site has one; other cities get the site's general events page.
+const SITES: { name: string; mark: string; bg: string; fg: string; la: string; any: string }[] = [
+  { name: "Facebook Events", mark: "f", bg: "#1877f2", fg: "#fff", la: "https://www.facebook.com/events/", any: "https://www.facebook.com/events/" },
+  { name: "Meetup", mark: "M", bg: "#f65858", fg: "#fff", la: "https://www.meetup.com/find/?source=EVENTS&location=us--ca--Los%20Angeles", any: "https://www.meetup.com/find/?source=EVENTS" },
+  { name: "Resident Advisor", mark: "RA", bg: "#f3ece2", fg: "#111", la: "https://ra.co/events/us/losangeles", any: "https://ra.co/events" },
+  { name: "Luma", mark: "L", bg: "#ff8ad8", fg: "#111", la: "https://luma.com/los-angeles", any: "https://luma.com/discover" },
+  { name: "Partiful", mark: "P", bg: "#7c3aed", fg: "#fff", la: "https://partiful.com/explore", any: "https://partiful.com/explore" },
+  { name: "Posh", mark: "PO", bg: "#111", fg: "#fff", la: "https://posh.vip/explore", any: "https://posh.vip/explore" },
+  { name: "AllEvents", mark: "AE", bg: "#ff9a3c", fg: "#111", la: "https://allevents.in/los-angeles", any: "https://allevents.in" },
+];
+
 const PARSE_BATCH = 20, ADD_BATCH = 8;
 const DAY = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", weekday: "short", month: "short", day: "numeric" });
 const TIME = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", hour: "numeric", minute: "2-digit" });
@@ -127,6 +139,23 @@ export default function SomedudePage() {
     <main className="mx-auto max-w-2xl px-4 py-10">
       <h1 className="font-poster text-[40px] uppercase leading-none"><span className="text-[#fff23a]">Somedude</span> <span className="text-[#ff5fae]">desk</span></h1>
       <p className="mt-2 text-sm text-white/60">{area} · paste a page of events, see what we&apos;re missing, put it on the pole.</p>
+
+      {/* Shortcuts to the sites worth pasting from. */}
+      <nav aria-label="Where to look" className="mt-5">
+        <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-white/50">Where to look</p>
+        <ul className="mt-2 flex flex-wrap gap-3">
+          {SITES.map((site) => (
+            <li key={site.name}>
+              <a href={/angeles/i.test(area) ? site.la : site.any} target="_blank" rel="noopener noreferrer" title={site.name}
+                className="group flex w-16 flex-col items-center gap-1 text-center">
+                <span className="flex size-12 items-center justify-center rounded-full text-[17px] font-extrabold ring-2 ring-transparent transition group-hover:ring-white/70 group-focus-visible:ring-white"
+                  style={{ background: site.bg, color: site.fg }} aria-hidden>{site.mark}</span>
+                <span className="text-[11px] font-semibold leading-tight text-white/70 group-hover:text-white">{site.name.replace(" Events", "")}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </nav>
 
       {/* 1. Paste or drop */}
       <div className="flyer mt-6 px-4 pb-5 pt-6 text-[#2a2016] sm:px-6" style={{ "--paper": "#cdae7e", "--tilt": "0deg" } as React.CSSProperties}>
