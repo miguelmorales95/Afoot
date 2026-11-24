@@ -40,7 +40,11 @@ interface Loc {
   lat: number;
   lng: number;
   label: string;
+  /** The whole region, not one spot: a wide radius and no "mi away". */
+  all?: boolean;
 }
+
+const ALL_LA: Loc = { lat: 34.05, lng: -118.25, label: "All of LA", all: true };
 
 const STORAGE_KEY = "afoot_loc";
 const PAGE = 15;
@@ -83,13 +87,15 @@ export default function Home() {
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved) as Loc;
-        setLoc(parsed);
-        void loadEvents(parsed);
-      }
+      const start = saved ? (JSON.parse(saved) as Loc) : ALL_LA;
+      setLoc(start);
+      // First visit: show everything, with the search still open to narrow it down.
+      if (!saved) setHeroOpen(true);
+      void loadEvents(start);
     } catch {
-      /* ignore */
+      setLoc(ALL_LA);
+      setHeroOpen(true);
+      void loadEvents(ALL_LA);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -110,7 +116,7 @@ export default function Home() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/events?lat=${l.lat}&lng=${l.lng}&radius=25&days=45`);
+      const res = await fetch(`/api/events?lat=${l.lat}&lng=${l.lng}&radius=${l.all ? 80 : 25}&days=45`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load events");
       setEvents(data.events as NearbyEvent[]);
@@ -279,6 +285,15 @@ export default function Home() {
 
   const areaChips = (
     <div className="flex flex-wrap justify-center gap-1.5" aria-label="Neighborhoods">
+      <button
+        type="button"
+        onClick={() => { setQuery(""); persist(ALL_LA); void loadEvents(ALL_LA); }}
+        className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+          loc?.all ? "bg-[#ffe45c] text-[#1a1a1a]" : "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
+        }`}
+      >
+        All of LA
+      </button>
       {LAUNCH_AREAS.map((a) => (
         <button
           key={a.name}
@@ -449,7 +464,7 @@ export default function Home() {
             {(() => {
               const colors = posterColors(featured.map((f) => f.ev));
               return featured.map(({ ev, campaign }, i) => (
-                <EventCard key={ev.occurrence_id} ev={ev} feedback={feedback} featured={campaign} paper={colors[i]} />
+                <EventCard key={ev.occurrence_id} ev={ev} feedback={feedback} featured={campaign} paper={colors[i]} wide={!!loc?.all} />
               ));
             })()}
           </div>
@@ -496,7 +511,7 @@ export default function Home() {
               </div>
               <div className="flyer-stack mt-2">
                 {dayEvents.slice(0, limit).map((ev, i) => (
-                  <EventCard key={ev.occurrence_id} ev={ev} feedback={feedback} paper={colors[i]} />
+                  <EventCard key={ev.occurrence_id} ev={ev} feedback={feedback} paper={colors[i]} wide={!!loc?.all} />
                 ))}
               </div>
               {hidden > 0 && (
@@ -595,7 +610,7 @@ const daysBetween = (a: string, b: string) => Math.round((Date.parse(dayIso(b)) 
 const monthDay = (key: string) =>
   new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(dayIso(key)));
 
-const placeName = (l: Loc) => (l.label === "your location" ? "you" : l.label);
+const placeName = (l: Loc) => (l.all ? "LA" : l.label === "your location" ? "you" : l.label);
 
 // Day-glo poster stock (Colby-style); each event keeps the same color and tilt on every visit.
 const PAPER = ["#fff23a", "#ff5fae", "#86f45c", "#ff9a3c", "#62d8ff"];
@@ -619,7 +634,8 @@ function posterColors(evs: NearbyEvent[]): string[] {
   return out;
 }
 
-function EventCard({ ev, feedback, featured, paper }: { ev: NearbyEvent; feedback: boolean; featured?: LiveCampaign; paper?: string }) {
+/** `wide`: browsing all of LA, where distance from downtown means nothing, so it's left off. */
+function EventCard({ ev, feedback, featured, paper, wide }: { ev: NearbyEvent; feedback: boolean; featured?: LiveCampaign; paper?: string; wide?: boolean }) {
   const cat = categoryMeta(ev.category);
   const seenRef = useSeen(featured?.id ?? null);
   // Views and taps feed the traffic ranking (counts only).
@@ -688,7 +704,7 @@ function EventCard({ ev, feedback, featured, paper }: { ev: NearbyEvent; feedbac
           </div>
         )}
         <p className="mt-1 text-[15px] font-bold leading-snug text-[#111]">
-          {ev.venue_name} · {formatDistance(ev.distance_km)} away
+          {ev.venue_name}{wide ? "" : ` · ${formatDistance(ev.distance_km)} away`}
           {ev.price ? ` · ${ev.price_is_usual ? "usually " : ""}${ev.price}` : ""}
         </p>
         {ev.venue_good_to_know && (
