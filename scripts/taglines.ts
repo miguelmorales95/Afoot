@@ -66,6 +66,7 @@ async function main() {
       continue;
     }
     for (const t of out.taglines ?? []) {
+      if (!t) continue;
       const ev = chunk[t.i];
       const tagline = cleanTagline(t.tagline);
       if (!ev || !tagline) continue;
