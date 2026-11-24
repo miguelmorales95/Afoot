@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { demoNearby, isDemoMode } from "@/lib/demo";
 import { hasLocalEvents, localNearby } from "@/lib/localEvents";
+import { isRun } from "@/lib/format";
 
 // GET /api/events?lat=..&lng=..&radius=15&days=30
 // Returns upcoming event occurrences near a point, sorted by time.
@@ -50,12 +51,32 @@ export async function GET(req: NextRequest) {
 }
 
 /**
+ * One card per run: a multi-day run ("through Dec 24") that starts inside an earlier run of
+ * the same event is the same run read again on a later day, so only the earliest is kept.
+ */
+function dropRepeatedRuns(occurrences: any[]) {
+  const runs = occurrences
+    .filter((o) => isRun(o))
+    .sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at));
+  const drop = new Set<string>();
+  const kept = new Map<string, any[]>();
+  for (const o of runs) {
+    const prev = kept.get(o.event_id) ?? [];
+    const t = Date.parse(o.starts_at);
+    if (prev.some((p) => t < Date.parse(p.ends_at))) drop.add(o.occurrence_id);
+    else kept.set(o.event_id, [...prev, o]);
+  }
+  return drop.size ? occurrences.filter((o) => !drop.has(o.occurrence_id)) : occurrences;
+}
+
+/**
  * Group occurrences by event + date (LA timezone).
  * For each group, keep the next occurrence and add occurrence_count_today.
  */
-function groupByEventAndDate(occurrences: any[]) {
+function groupByEventAndDate(all: any[]) {
   const tz = "America/Los_Angeles";
   const groups = new Map<string, any[]>();
+  const occurrences = dropRepeatedRuns(all);
 
   for (const occ of occurrences) {
     // Format: YYYY-MM-DD in LA timezone

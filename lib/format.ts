@@ -157,3 +157,7 @@ export function briefDescription(
   }
   return out.length >= 2 ? out.join(" ") : "";
 }
+
+/** A date range spanning days (an exhibit, a play's run, "photos with Santa through Dec 24"). */
+export const isRun = (o: { starts_at: string; ends_at: string | null }) =>
+  !!o.ends_at && Date.parse(o.ends_at) - Date.parse(o.starts_at) > 26 * 3600 * 1000;

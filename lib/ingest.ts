@@ -5,6 +5,7 @@ import { supabase } from "./supabase";
 import { fetchPageText, fetchRenderedText } from "./scrape";
 import { extractEvents } from "./extract";
 import type { ExtractedEvent, Venue } from "./types";
+import { isRun } from "./format";
 
 function slugify(s: string): string {
   return s
@@ -82,6 +83,26 @@ async function duplicateDates(venueId: string, eventId: string, title: string, s
 }
 
 /**
+ * Runs this event already lists that a new run overlaps. Pages that say "now through Dec 24"
+ * give no start date, so the extractor uses the day it read the page: every re-read would
+ * otherwise add the same run again with a new start. Returns the existing run each new one
+ * falls inside (by new start time), so the new copy is skipped and the old one's end updated.
+ */
+async function overlappingRuns(eventId: string, rows: { starts_at: string; ends_at: string | null }[]) {
+  const runs = rows.filter(isRun);
+  const hits = new Map<string, { id: string; starts_at: string; ends_at: string }>();
+  if (!runs.length) return hits;
+  const { data } = await supabase.from("event_occurrences").select("id, starts_at, ends_at").eq("event_id", eventId).not("ends_at", "is", null);
+  const existing = (data ?? []).filter(isRun);
+  for (const r of runs) {
+    const t = Date.parse(r.starts_at);
+    const old = existing.find((e) => Date.parse(e.starts_at) !== t && Date.parse(e.starts_at) <= t && t < Date.parse(e.ends_at!));
+    if (old) hits.set(r.starts_at, { id: old.id, starts_at: old.starts_at, ends_at: r.ends_at! });
+  }
+  return hits;
+}
+
+/**
  * Upsert a batch of extracted events (and their occurrences) for one venue.
  * Idempotent: events keyed by dedupe_key; future occurrences updated in place, and dates the
  * source dropped removed (or marked cancelled if anyone RSVP'd or chatted).
@@ -135,13 +156,22 @@ export async function storeExtractedEvents(opts: {
       });
 
     const dupes = await duplicateDates(opts.venueId, eventRow.id, ev.title, rows.map((r) => r.starts_at));
-    const filteredRows = rows.filter((r) => !dupes.has(r.starts_at));
+    const runs = await overlappingRuns(eventRow.id, rows);
+    const filteredRows = rows.filter((r) => !dupes.has(r.starts_at) && !runs.has(r.starts_at));
     if (dupes.size) log(`  ~ "${ev.title}": ${dupes.size} date(s) already listed by a matching event here; skipped`);
+    if (runs.size) {
+      // Same run read again: keep the original (and its RSVPs/chat), take the page's current end date.
+      for (const { id, ends_at } of runs.values()) await supabase.from("event_occurrences").update({ ends_at }).eq("id", id);
+      log(`  ~ "${ev.title}": run already listed; kept the original start`);
+    }
 
     // Dates the page no longer lists fall off, but never by deleting a date people said they're
     // going to or chatted about: those are marked cancelled instead (deleting would take their
     // RSVPs and messages with it). Dates still listed are updated in place, keeping their id.
-    const dropped = await staleOccurrences(eventRow.id, filteredRows.map((r) => Date.parse(r.starts_at)));
+    const dropped = await staleOccurrences(eventRow.id, [
+      ...filteredRows.map((r) => Date.parse(r.starts_at)),
+      ...[...runs.values()].map((r) => Date.parse(r.starts_at)),
+    ]);
     if (dropped.keep.length) {
       await supabase.from("event_occurrences").update({ cancelled: true }).in("id", dropped.keep);
       log(`  ~ "${ev.title}": ${dropped.keep.length} dropped date(s) have RSVPs or chat; marked cancelled`);
