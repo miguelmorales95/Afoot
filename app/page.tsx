@@ -51,7 +51,6 @@ const FILTERS: { key: string; label: string }[] = [
   { key: "market", label: "🛍️ Markets" },
 ];
 
-const PAGE = 25;
 
 export default function Home() {
   const [loc, setLoc] = useState<Loc | null>(null);
@@ -205,15 +204,6 @@ export default function Home() {
     for (const bucket of map.values()) bucket.sort((x, y) => (y.traffic_score ?? 0) - (x.traffic_score ?? 0));
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [visible, featured]);
-
-  // Each day shows its top 25 by traffic; "View more" adds 25, and the third click shows all.
-  const [shown, setShown] = useState<Record<string, number>>({});
-  useEffect(() => setShown({}), [events, filter]);
-  const showDay = (key: string, n: number) => {
-    const shrinking = n < (shown[key] ?? PAGE);
-    setShown((s) => ({ ...s, [key]: n }));
-    if (shrinking) document.getElementById(`day-${key}`)?.scrollIntoView({ block: "start", behavior: "smooth" });
-  };
 
   const scrollToControls = () =>
     requestAnimationFrame(() => controlsRef.current?.scrollIntoView({ block: "start" }));
@@ -453,10 +443,7 @@ export default function Home() {
       {!loading &&
         view === "list" &&
         grouped.map(([key, dayEvents], di) => {
-          const limit = shown[key] ?? PAGE;
-          const more = dayEvents.length - limit;
-          const shownEvents = dayEvents.slice(0, limit);
-          const colors = posterColors(shownEvents);
+          const colors = posterColors(dayEvents);
           return (
             <div key={key} id={`day-${key}`} className="mb-8 scroll-mt-14">
               <div className="sticky top-14 z-10 -mx-4 flex items-center justify-between gap-3 bg-[#2b2119]/95 px-4 py-2 backdrop-blur">
@@ -467,19 +454,6 @@ export default function Home() {
                   <span className="shrink-0 text-sm font-bold text-white/70">{dayEvents.length} {dayEvents.length === 1 ? "event" : "events"}</span>
                 </h2>
                 <div className="flex shrink-0 items-center gap-1.5">
-                {dayEvents.length > PAGE && (
-                  <div className="inline-flex shrink-0 rounded-full border border-white/10 bg-white/5 p-0.5 text-[11px] font-medium" aria-label="How many to show">
-                    {[["Top 25", PAGE], ["50", PAGE * 2], ["All", Infinity]].filter(([, n]) => n === Infinity || n === PAGE || (n as number) < dayEvents.length).map(([label, n]) => {
-                      const on = n === Infinity ? limit >= dayEvents.length : limit === n;
-                      return (
-                        <button key={label} onClick={() => showDay(key, n as number)}
-                          className={`rounded-full px-2.5 py-0.5 transition ${on ? "bg-white text-black" : "text-white/60 hover:text-white"}`}>
-                          {label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
                   <button
                     onClick={() => setSheetOpen(true)}
                     aria-label="Change place or event type"
@@ -503,19 +477,10 @@ export default function Home() {
                 </div>
               </div>
               <div className="flyer-stack mt-2">
-                {shownEvents.map((ev, i) => (
+                {dayEvents.map((ev, i) => (
                   <EventCard key={ev.occurrence_id} ev={ev} feedback={feedback} paper={colors[i]} />
                 ))}
               </div>
-              {more > 0 && (
-                <button
-                  onClick={() => showDay(key, limit >= PAGE * 3 ? Infinity : limit + PAGE)}
-                  className="mt-3 w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-medium text-white/70 hover:bg-white/[0.06]"
-                >
-                  {limit >= PAGE * 3 ? `Show all ${dayEvents.length}` : `View ${Math.min(PAGE, more)} more`}
-                  <span className="text-white/40"> · {more} not shown</span>
-                </button>
-              )}
             </div>
           );
         })}
