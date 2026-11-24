@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import type { NearbyEvent } from "@/lib/types";
 import {
   briefWords,
+  formatTag,
   parkingStatus,
   categoryMeta,
   dayKey,
@@ -700,7 +701,7 @@ function EventCard({ ev, feedback, featured, paper }: { ev: NearbyEvent; feedbac
             )}
             {(ev.tags ?? []).slice(0, 4).map((t) => (
               <span key={t} className="rounded-full border-[1.5px] border-[#111]/70 px-2 py-0.5 text-xs font-bold text-[#111]">
-                {t}
+                {formatTag(t)}
               </span>
             ))}
           </div>

@@ -200,3 +200,19 @@ export function parkingStatus(ev: { venue_parking?: string | null; heads_up?: Pa
   if ((ev.heads_up?.parking ?? 0) >= 2) return "no-parking";
   return null;
 }
+
+const TAG_ACRONYMS: Record<string, string> = { dj: "DJ", djs: "DJs", lgbtq: "LGBTQ", "lgbtq+": "LGBTQ+", rsvp: "RSVP", bipoc: "BIPOC", aapi: "AAPI", ai: "AI", la: "LA", byob: "BYOB", diy: "DIY", edm: "EDM", vr: "VR", asl: "ASL", stem: "STEM", rnb: "R&B", "r&b": "R&B", ipa: "IPA" };
+// Hyphens that belong to the word ("all-ages", "hands-on"); other hyphens in a tag are slug joins.
+const KEEP_HYPHEN = /-(friendly|on|ages|energy|up|in|through|off|night-only)$/;
+
+/** A stored tag as people read it: "date-night" → "Date night", "dj" → "DJ", "all-ages" → "All-ages". */
+const TAG_NAMES: Record<string, string> = { "dia-de-los-muertos": "Día de los Muertos", "dia de los muertos": "Día de los Muertos", "lunar new year": "Lunar New Year" };
+
+export function formatTag(tag: string): string {
+  if (TAG_NAMES[tag.toLowerCase()]) return TAG_NAMES[tag.toLowerCase()];
+  const words = tag.split(/\s+/).flatMap((w) => (KEEP_HYPHEN.test(w) ? [w] : w.split("-")));
+  const out = words.filter(Boolean).map((w) => TAG_ACRONYMS[w.toLowerCase()] ?? w);
+  if (!out.length) return tag;
+  out[0] = out[0].charAt(0).toUpperCase() + out[0].slice(1);
+  return out.join(" ");
+}
