@@ -52,7 +52,7 @@ Return one entry per event, with i = the event's number.`;
   for (let b = 0; b < evs.length; b += 10) {
     const chunk = evs.slice(b, b + 10);
     const prompt = chunk.map((c, i) => `${i}. Title: ${c.title}\n   Venue: ${c.venue}\n   Type: ${c.category}\n   Listing: ${c.description.slice(0, 700) || c.tagline || "(no description)"}`).join("\n\n");
-    const parsed = await completeJson<{ lines: { i: number; line: string }[] }>({ model: VOICE_MODEL, system, prompt, schema, maxTokens: 1500 });
+    const parsed = await completeJson<{ lines: { i: number; line: string }[] }>({ model: VOICE_MODEL, system, prompt, schema, maxTokens: 3000 });
     for (const l of parsed.lines ?? []) if (chunk[l.i]) out[b + l.i] = cleanVoiceLine(l.line);
   }
   return out;
