@@ -31,6 +31,7 @@
     "recurring": "tsx scripts/recurring.ts",
     "taglines": "tsx scripts/taglines.ts",
     "schedule-labels": "tsx scripts/schedule-labels.ts",
+    "recategorize-art": "tsx scripts/recategorize-art.ts",
     "venue-parking": "tsx scripts/venue-parking.ts",
     "digest": "tsx scripts/digest.ts",
     "rank": "tsx scripts/rank.ts"

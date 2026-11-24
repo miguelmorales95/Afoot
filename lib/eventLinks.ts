@@ -32,7 +32,7 @@ export async function pendingEventLinks(): Promise<EventLinkRow[]> {
   return data as EventLinkRow[];
 }
 
-const CATS: EventCategory[] = ["music", "karaoke", "trivia", "games", "comedy", "market", "food", "class", "other"];
+const CATS: EventCategory[] = ["music", "karaoke", "trivia", "games", "comedy", "market", "food", "class", "art", "other"];
 
 /** Approves a link (with the admin's corrections) into a live event at a matched or new venue. */
 export async function approveEventLink(id: string, d: LinkDetails) {

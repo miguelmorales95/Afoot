@@ -112,7 +112,7 @@ Respond with ONLY this JSON object:
   "has_events": boolean,           // evidence of recurring/one-off events
   "events_url": string | null,     // absolute URL, chosen from the provided links if possible
   "newsletter_url": string | null, // absolute URL for a newsletter/mailing-list signup
-  "categories": string[],          // from: music, karaoke, trivia, games, comedy, market, food, class, other
+  "categories": string[],          // from: music, karaoke, trivia, games, comedy, market, food, class, art, other
   "reason": string                 // one short sentence
 }`;
 

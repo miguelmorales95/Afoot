@@ -9,6 +9,7 @@ export type EventCategory =
   | "market"
   | "food"
   | "class"
+  | "art"
   | "other";
 
 /** One concrete occurrence returned by the `nearby_events` RPC (a flat row). */

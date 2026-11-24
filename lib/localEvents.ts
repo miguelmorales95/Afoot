@@ -83,7 +83,7 @@ export function readLocalRows(): CsvRow[] {
   return parseCsv(fs.readFileSync(file, "utf8"));
 }
 
-const CATEGORIES: EventCategory[] = ["music", "karaoke", "trivia", "games", "comedy", "market", "food", "class", "other"];
+const CATEGORIES: EventCategory[] = ["music", "karaoke", "trivia", "games", "comedy", "market", "food", "class", "art", "other"];
 
 export function slugify(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 80);

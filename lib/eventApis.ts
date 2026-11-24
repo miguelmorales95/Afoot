@@ -96,7 +96,7 @@ async function eb(path: string, params: Record<string, string> = {}) {
   return res.json();
 }
 
-const EB_CATEGORY: Record<string, EventCategory> = { "103": "music", "110": "food", "105": "other", "113": "other", "115": "class", "119": "games" };
+const EB_CATEGORY: Record<string, EventCategory> = { "103": "music", "110": "food", "104": "art", "105": "art", "113": "other", "115": "class", "119": "games" };
 
 function ebEvent(e: any): LinkedEvent | null {
   const start = e.start?.utc;

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 
 const TOKEN_KEY = "afoot_admin_token";
 const savedToken = () => { try { return localStorage.getItem(TOKEN_KEY) || ""; } catch { return ""; } };
-const CATS = ["music", "karaoke", "trivia", "games", "comedy", "market", "food", "class", "other"];
+const CATS = ["music", "karaoke", "trivia", "games", "comedy", "market", "food", "class", "art", "other"];
 
 interface Details { title?: string; description?: string | null; starts_at?: string; ends_at?: string | null; url?: string; price?: string | null; category?: string; venue_name?: string | null; address?: string | null; lat?: number | null; lng?: number | null }
 interface Link { id: string; url: string; source: string; extracted: Details | null; read_error: string | null; note: string | null; submitter_email: string | null; created_at: string }

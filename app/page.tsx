@@ -53,7 +53,8 @@ const PAGE = 15;
 const FILTERS: { key: string; label: string }[] = [
   { key: "music", label: "🎸 Music" },
   { key: "comedy", label: "🎭 Comedy" },
-  { key: "class", label: "🎨 Classes" },
+  { key: "class", label: "✏️ Classes" },
+  { key: "art", label: "🎨 Art" },
   { key: "games", label: "🧠 Games" },
   { key: "market", label: "🛍️ Markets" },
   { key: "food", label: "🍽️ Food" },
@@ -221,6 +222,28 @@ export default function Home() {
   const [shown, setShown] = useState<Record<string, number>>({});
   // Lineup cards (several shows at one venue that day) the reader has opened into their own cards.
   const [openLineups, setOpenLineups] = useState<Set<string>>(new Set());
+
+  // The day whose header is pinned at the top (or the first day): it alone shows filter + map.
+  const [currentDay, setCurrentDay] = useState<string | null>(null);
+  useEffect(() => {
+    if (view !== "list" || !grouped.length) return;
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const PINNED = 56 + 8; // site header height, plus a little
+      let day = grouped[0][0];
+      for (const [key] of grouped) {
+        const el = document.getElementById(`day-${key}`);
+        if (el && el.getBoundingClientRect().top <= PINNED) day = key;
+        else break;
+      }
+      setCurrentDay((d) => (d === day ? d : day));
+    };
+    const onScroll = () => { if (!frame) frame = requestAnimationFrame(update); };
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => { window.removeEventListener("scroll", onScroll); if (frame) cancelAnimationFrame(frame); };
+  }, [view, grouped]);
   const toggleLineup = (id: string) =>
     setOpenLineups((prev) => {
       const next = new Set(prev);
@@ -496,6 +519,8 @@ export default function Home() {
                   </span>
                   <span className="shrink-0 text-sm font-bold text-white/70">{dayEvents.length} {dayEvents.length === 1 ? "event" : "events"}</span>
                 </h2>
+                {/* One filter + map pair on the page: on the day header pinned at the top. */}
+                {key === currentDay && (
                 <div className="flex shrink-0 items-center gap-1.5">
                   <button
                     onClick={() => setSheetOpen(true)}
@@ -518,6 +543,7 @@ export default function Home() {
                     </svg>
                   </button>
                 </div>
+                )}
               </div>
               <div className="flyer-stack mt-2">
                 {items.slice(0, limit).flatMap((it, i) => {

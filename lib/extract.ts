@@ -31,7 +31,9 @@ string WITH the offset, e.g. "2026-03-01T18:00:00-08:00". If no end time is know
 If a start time is unknown but the date is known, use T19:00:00 as a placeholder for sorting AND
 set "time_unknown": true on that event, so the site shows "Time TBA" instead of a made-up time.
 
-category must be one of: music, karaoke, trivia, games, comedy, market, food, class, other.
+category must be one of: music, karaoke, trivia, games, comedy, market, food, class, art, other.
+"art" is for art shows, exhibitions, gallery openings, film screenings, theater, plays, dance and
+ballet performances (a class or workshop in these is "class"; a concert or opera is "music").
 
 tags: 2-5 short lowercase tags describing the VIBE and ACTIVITY only — what it feels like and
 what you'd actually do. Help someone decide if it's their scene. Good tags:

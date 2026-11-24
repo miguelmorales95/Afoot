@@ -54,7 +54,9 @@ const CATEGORY: [EventCategory, RegExp][] = [
   ["market", /\b(farmers'? )?market\b|\bbazaar\b|\bcraft fair\b|\bswap meet\b|\bflea\b|\bpop-?up shop\b/i],
   ["food", /\bfood\b|\btasting\b|\bcooking\b|\bdinner\b|\bbrunch\b|\bwine\b|\bbeer\b|\btacos?\b/i],
   ["music", /\bconcerts?\b|\bmusic(al)?\b|\bband\b|\bjazz\b|\borchestra\b|\bsymphony\b|\bchoirs?\b|\bchoral\b|\brecitals?\b|\bdj\b|\bopera\b|\bensembles?\b|\bsing(ing|ers?|-?along)?\b/i],
-  ["class", /\bclass(es)?\b|\bworkshops?\b|\blectures?\b|\btalks?\b|\breadings?\b|\bbook club\b|\bseminars?\b|\bpanel\b|\bdiscussion\b|\btours?\b|\bstory ?time\b|\bcrafts?\b|\blessons?\b|\bfilms?\b|\bscreenings?\b|\bexhibit(ion)?s?\b/i],
+  ["class", /\bclass(es)?\b|\bworkshops?\b|\blectures?\b|\btalks?\b|\breadings?\b|\bbook club\b|\bseminars?\b|\bpanel\b|\bdiscussion\b|\btours?\b|\bstory ?time\b|\bcrafts?\b|\blessons?\b/i],
+  // After "class", so "dance class" stays a class.
+  ["art", /\bfilms?\b|\bscreenings?\b|\bcinema\b|\bmovies?\b|\bexhibit(ion)?s?\b|\bgaller(y|ies)\b|\bart(ists?)?\b|\btheat(er|re)\b|\bplays?\b|\bballet\b|\bdance performance\b/i],
 ];
 
 export function categoryFor(text: string): EventCategory {

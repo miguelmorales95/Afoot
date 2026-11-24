@@ -12,7 +12,8 @@ export const CATEGORY_META: Record<
   comedy: { label: "Comedy", emoji: "🎭", className: "bg-orange-500/15 text-orange-300 ring-orange-500/30" },
   market: { label: "Market", emoji: "🛍️", className: "bg-teal-500/15 text-teal-300 ring-teal-500/30" },
   food: { label: "Food", emoji: "🍽️", className: "bg-red-500/15 text-red-300 ring-red-500/30" },
-  class: { label: "Class", emoji: "🎨", className: "bg-sky-500/15 text-sky-300 ring-sky-500/30" },
+  class: { label: "Class", emoji: "✏️", className: "bg-sky-500/15 text-sky-300 ring-sky-500/30" },
+  art: { label: "Art", emoji: "🎨", className: "bg-rose-500/15 text-rose-300 ring-rose-500/30" },
   other: { label: "Event", emoji: "✨", className: "bg-violet-500/15 text-violet-300 ring-violet-500/30" },
 };
 

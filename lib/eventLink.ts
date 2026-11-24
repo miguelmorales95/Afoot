@@ -34,6 +34,7 @@ function guessCategory(text: string): EventCategory {
   if (/market|swap|fair|flea/.test(t)) return "market";
   if (/game night|board game|bingo|dnd|d&d/.test(t)) return "games";
   if (/workshop|class|lesson|course/.test(t)) return "class";
+  if (/film|screening|cinema|movie|exhibit|gallery|theat(er|re)|\bplay\b|ballet/.test(t)) return "art";
   if (/tasting|dinner|brunch|pop-?up|food/.test(t)) return "food";
   if (/concert|live music|band|dj|jazz|open mic/.test(t)) return "music";
   return "other";
