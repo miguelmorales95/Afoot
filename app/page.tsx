@@ -7,11 +7,11 @@ import {
   briefWords,
   formatTag,
   parkingStatus,
+  scheduleLine,
   categoryMeta,
   dayKey,
   formatDayLabel,
   formatDistance,
-  formatShortDate,
   formatTime,
 } from "@/lib/format";
 import AdRail from "@/components/AdRail";
@@ -601,6 +601,8 @@ function EventCard({ ev, feedback, featured, paper }: { ev: NearbyEvent; feedbac
   const more = ev.occurrence_count_remaining ?? 0;
   const keywords = useMemo(() => briefWords(ev), [ev]);
   const parking = parkingStatus(ev);
+  // A run that started earlier already says "Until …" in the time block.
+  const schedule = scheduleLine(ev, !(startedBefore(ev) && ev.ends_at));
   const [mapOpen, setMapOpen] = useState(false);
   const closeMap = useCallback(() => setMapOpen(false), []);
   const body = (
@@ -624,8 +626,8 @@ function EventCard({ ev, feedback, featured, paper }: { ev: NearbyEvent; feedbac
             </>
           )}
         </time>
-        {ev.is_recurring && ev.schedule_label && (
-          <p className="text-center text-[13px] font-extrabold uppercase leading-tight tracking-wide text-[#111]">{ev.schedule_label}</p>
+        {schedule && (
+          <p className="text-center text-[13px] font-extrabold uppercase leading-tight tracking-wide text-[#111]">{schedule}</p>
         )}
         <button
           type="button"
@@ -659,11 +661,6 @@ function EventCard({ ev, feedback, featured, paper }: { ev: NearbyEvent; feedbac
           {ev.venue_name} · {formatDistance(ev.distance_km)} away
           {ev.price ? ` · ${ev.price_is_usual ? "usually " : ""}${ev.price}` : ""}
         </p>
-        {ev.last_occurrence_date && (
-          <p className="mt-0.5 text-sm font-extrabold uppercase tracking-wide text-[#111]">
-            Until {formatShortDate(ev.last_occurrence_date)}
-          </p>
-        )}
         {ev.venue_good_to_know && (
           <p className="mt-0.5 text-sm font-medium text-black/80">ℹ️ {ev.venue_good_to_know}</p>
         )}

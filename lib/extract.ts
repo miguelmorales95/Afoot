@@ -153,7 +153,7 @@ export function cleanScheduleLabel(t: unknown, source?: string | null): string |
   if (typeof t !== "string") return null;
   const s = t.trim().replace(/\.$/, "");
   const words = s.split(/\s+/).filter(Boolean).length;
-  if (words < 1 || words > 4 || /\d:\d|\d\s*(am|pm)\b/i.test(s)) return null;
+  if (/^(null|none|n\/a)$/i.test(s) || words < 1 || words > 4 || /\d:\d|\d\s*(am|pm)\b/i.test(s)) return null;
   if (source) {
     const src = source.toLowerCase(), lab = s.toLowerCase();
     if (DAYS.some((d) => new RegExp(`\\b${d}`).test(lab) && !src.includes(d))) return null;

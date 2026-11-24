@@ -216,3 +216,44 @@ export function formatTag(tag: string): string {
   out[0] = out[0].charAt(0).toUpperCase() + out[0].slice(1);
   return out.join(" ");
 }
+
+const DAY3: [RegExp, string][] = [
+  [/\b(mondays?|mon)\b/gi, "MON"], [/\b(tuesdays?|tues?|tu)\b/gi, "TUE"], [/\b(wednesdays?|weds?)\b/gi, "WED"],
+  [/\b(thursdays?|thurs?|thu|th)\b/gi, "THU"], [/\b(fridays?|frid?)\b/gi, "FRI"], [/\b(saturdays?|sat)\b/gi, "SAT"],
+  [/\b(sundays?|sun)\b/gi, "SUN"],
+];
+
+/** "Every Tue & Thurs" → "TUE, THU"; "Fridays and Saturdays" → "FRI, SAT". */
+export function normalizeSchedule(label: string): string {
+  let s = label
+    .replace(/([a-z])([A-Z])/g, "$1 $2") // "MonOfMonth" → "Mon Of Month"
+    .replace(/\bevery\b|\b(evenings?|nights?|mornings?|afternoons?)\b/gi, " ")
+    .replace(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\b/gi, " ");
+  // "1st Sun of the month, monthly" → "1st Sun": the ordinal already says monthly.
+  if (/\b(1st|2nd|3rd|4th|5th|last)\b/i.test(s)) s = s.replace(/\bof (the |each |every )?month\b|\bmonthly\b/gi, " ");
+  for (const [re, d] of DAY3) s = s.replace(re, d);
+  return s
+    .replace(/\s*(&|\+|\band\b|\/)\s*/gi, ", ")
+    .replace(/\s*,\s*(,\s*)*/g, ", ")
+    .replace(/\s+/g, " ")
+    .replace(/^[\s,]+|[\s,]+$/g, "")
+    .toUpperCase();
+}
+
+/**
+ * The line under a card's time: the schedule and how long it runs, e.g. "MON, WED, FRI UNTIL 9/16"
+ * or "WEEKLY UNTIL 10/13". `withUntil` is false when the time block already says "Until".
+ */
+export function scheduleLine(
+  ev: { is_recurring?: boolean; schedule_label?: string | null; last_occurrence_date?: string | null },
+  withUntil = true,
+): string | null {
+  const parts: string[] = [];
+  const label = ev.is_recurring && ev.schedule_label ? normalizeSchedule(ev.schedule_label) : "";
+  if (label && label !== "NULL") parts.push(label);
+  if (withUntil && ev.last_occurrence_date) {
+    const md = new Intl.DateTimeFormat("en-US", { timeZone: TZ, month: "numeric", day: "numeric" }).format(new Date(ev.last_occurrence_date));
+    parts.push(`UNTIL ${md}`);
+  }
+  return parts.length ? parts.join(" ") : null;
+}
