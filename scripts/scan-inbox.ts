@@ -379,8 +379,10 @@ async function scanCalendar() {
       return titleHit || (venueHit && t.length >= 5 && (xt.includes(t.slice(0, 8)) || t.includes(xt.slice(0, 8))));
     });
   };
+  // Calendar invites carry Google/Meet/Zoom links and our own site: those aren't event platforms.
+  const NOT_PLATFORMS = /^(g\.co|google\.com|gmail\.com|goo\.gl|zoom\.us|somedude\.app)$/;
   const linkDomains = (s?: string) =>
-    [...new Set([...(s ?? "").matchAll(/https?:\/\/[^\s"'<>)]+/g)].map((m) => registrableDomain(m[0])).filter(Boolean))].slice(0, 4);
+    [...new Set([...(s ?? "").matchAll(/https?:\/\/[^\s"'<>)]+/g)].map((m) => registrableDomain(m[0])).filter((d): d is string => !!d && !NOT_PLATFORMS.test(d)))].slice(0, 4);
 
   const missing = [], found = [];
   for (const e of pub) {

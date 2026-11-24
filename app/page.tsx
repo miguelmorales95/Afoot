@@ -61,7 +61,8 @@ export default function Home() {
   const [events, setEvents] = useState<NearbyEvent[]>([]);
   const [feedback, setFeedback] = useState(false); // flags/checks need the database
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState("all");
+  // Event types shown; empty means everything.
+  const [types, setTypes] = useState<Set<string>>(new Set());
   const [view, setView] = useState<View>("list");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -173,8 +174,8 @@ export default function Home() {
   };
 
   const visible = useMemo(
-    () => (filter === "all" ? events : events.filter((e) => e.category === filter)),
-    [events, filter],
+    () => (types.size === 0 ? events : events.filter((e) => types.has(e.category ?? "other"))),
+    [events, types],
   );
 
   // The launch area being browsed (chip, or a search/location near one): picks the area
@@ -211,7 +212,7 @@ export default function Home() {
 
   // Each day shows its top 15; the button adds 15, then 15 more, then shows the rest.
   const [shown, setShown] = useState<Record<string, number>>({});
-  useEffect(() => setShown({}), [events, filter]);
+  useEffect(() => setShown({}), [events, types]);
 
   const scrollToControls = () =>
     requestAnimationFrame(() => controlsRef.current?.scrollIntoView({ block: "start" }));
@@ -224,12 +225,18 @@ export default function Home() {
     scrollToControls();
   };
 
-  const pickFilter = (key: string, fromSheet = false) => {
-    setFilter(key);
-    if (fromSheet) {
-      setSheetOpen(false);
-      scrollToControls();
-    }
+  // Types combine ("Comedy" + "Music"); "Everything" clears them.
+  const pickFilter = (key: string) =>
+    setTypes((prev) => {
+      if (key === "all") return new Set();
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  const closeSheet = () => {
+    setSheetOpen(false);
+    scrollToControls();
   };
 
   const rangeStart = mapRange?.start ?? todayKey();
@@ -292,9 +299,10 @@ export default function Home() {
       {FILTERS.map((f) => (
         <button
           key={f.key}
-          onClick={() => pickFilter(f.key, fromSheet)}
+          onClick={() => pickFilter(f.key)}
+          aria-pressed={f.key === "all" ? types.size === 0 : types.has(f.key)}
           className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-            filter === f.key ? "bg-white text-black" : "bg-white/5 text-white/60 hover:bg-white/10"
+            (f.key === "all" ? types.size === 0 : types.has(f.key)) ? "bg-white text-black" : "bg-white/5 text-white/60 hover:bg-white/10"
           }`}
         >
           {f.label}
@@ -472,7 +480,7 @@ export default function Home() {
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
                       <path d="M4 6h16M7 12h10M10 18h4" />
                     </svg>
-                    {filter !== "all" && <span className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-[#ffe45c]" />}
+                    {types.size > 0 && <span className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-[#ffe45c]" />}
                   </button>
                   <button
                     onClick={() => openMap(key)}
@@ -552,6 +560,12 @@ export default function Home() {
             {areaChips}
             <h2 className="text-sm font-semibold uppercase tracking-wider text-white/50">What</h2>
             {typeChips(true)}
+            <button
+              onClick={closeSheet}
+              className="w-full rounded-full bg-[#fff23a] px-5 py-3 text-sm font-extrabold text-[#111] hover:bg-[#fff58a]"
+            >
+              Done
+            </button>
           </div>
         </div>
       )}
