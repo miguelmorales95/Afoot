@@ -43,6 +43,7 @@ interface Loc {
 }
 
 const STORAGE_KEY = "afoot_loc";
+const PAGE = 15;
 
 const FILTERS: { key: string; label: string }[] = [
   { key: "all", label: "Everything" },
@@ -207,6 +208,10 @@ export default function Home() {
     for (const bucket of map.values()) bucket.sort((x, y) => (y.traffic_score ?? 0) - (x.traffic_score ?? 0));
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [visible, featured]);
+
+  // Each day shows its top 15; the button adds 15, then 15 more, then shows the rest.
+  const [shown, setShown] = useState<Record<string, number>>({});
+  useEffect(() => setShown({}), [events, filter]);
 
   const scrollToControls = () =>
     requestAnimationFrame(() => controlsRef.current?.scrollIntoView({ block: "start" }));
@@ -446,7 +451,9 @@ export default function Home() {
       {!loading &&
         view === "list" &&
         grouped.map(([key, dayEvents], di) => {
-          const colors = posterColors(dayEvents);
+          const limit = shown[key] ?? PAGE;
+          const hidden = dayEvents.length - limit;
+          const colors = posterColors(dayEvents.slice(0, limit));
           return (
             <div key={key} id={`day-${key}`} className="mb-8 scroll-mt-14">
               <div className="sticky top-14 z-10 -mx-4 flex items-center justify-between gap-3 bg-[#2b2119]/95 px-4 py-2 backdrop-blur">
@@ -480,10 +487,19 @@ export default function Home() {
                 </div>
               </div>
               <div className="flyer-stack mt-2">
-                {dayEvents.map((ev, i) => (
+                {dayEvents.slice(0, limit).map((ev, i) => (
                   <EventCard key={ev.occurrence_id} ev={ev} feedback={feedback} paper={colors[i]} />
                 ))}
               </div>
+              {hidden > 0 && (
+                <button
+                  onClick={() => setShown((s) => ({ ...s, [key]: limit >= PAGE * 3 ? Infinity : limit + PAGE }))}
+                  className="mt-4 w-full rounded-full border-2 border-white/20 px-4 py-3 text-sm font-extrabold uppercase tracking-wide text-white/85 hover:border-white/40 hover:text-white"
+                >
+                  {limit >= PAGE * 3 ? `Show all ${dayEvents.length}` : `Show ${Math.min(PAGE, hidden)} more`}
+                  <span className="ml-2 font-bold normal-case tracking-normal text-white/45">{hidden} not shown</span>
+                </button>
+              )}
             </div>
           );
         })}
