@@ -1,5 +1,10 @@
 # Afoot Deduplication: Final Decisions
 
+> **Update 2026-11-24:** what was built, what failed, and the current rule are in
+> [dedup-research-and-learnings.md](dedup-research-and-learnings.md). The "fuzzy threshold 80" plan below
+> was never built; the word-based rule there replaced it.
+
+
 **Date:** 2026-11-23 | **Decision Maker:** Miguel Morales
 
 ---

@@ -15,6 +15,7 @@ This folder contains the complete strategy for discovering 50–80 new undergrou
 
 #### Part 1: Newsletter Discovery
 - **[afoot-discovery-strategy.md](afoot-discovery-strategy.md)** — Full section on scanning Gmail, finding newsletters, extraction pipeline. Scanner: `npm run scan:inbox` (see INBOX-SCAN.md).
+- **[dedup-research-and-learnings.md](dedup-research-and-learnings.md)** — How we decide two listings are the same event: what others do, what we tried, what broke, the current rule.
 - **[INBOX-SCAN.md](INBOX-SCAN.md)** — `npm run scan:inbox`: sign in to any Google account, get a list of venues/sources to track (setup + how to read results).
 
 #### Part 2: IG Curator Partnerships

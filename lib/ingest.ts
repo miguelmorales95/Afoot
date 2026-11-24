@@ -6,6 +6,7 @@ import { fetchPageText, fetchRenderedText } from "./scrape";
 import { extractEvents } from "./extract";
 import type { ExtractedEvent, Venue } from "./types";
 import { isRun } from "./format";
+import { similarTitles, SAME_TIME_MS } from "./dedupe";
 
 function slugify(s: string): string {
   return s
@@ -45,12 +46,36 @@ async function staleOccurrences(eventId: string, listed: number[]) {
 }
 
 const HOUR = 3600 * 1000;
-const normTitle = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-/** Same title, or one contains the other ("Trivia" vs "Trivia Night at the Bar"), ignoring case and punctuation. */
-export function sameTitle(a: string, b: string): boolean {
-  const x = normTitle(a), y = normTitle(b);
-  if (!x || !y) return false;
-  return x === y || (Math.min(x.length, y.length) >= 6 && (x.includes(y) || y.includes(x)));
+
+/**
+ * The event this listing already is, under another title: same venue, a date within an hour,
+ * and a similar title. Sources (and the extraction model, night to night) word the same show
+ * differently, and the title is part of the event's key, so without this every rewording made
+ * a new event. Returns the existing event's key and title, so the upsert lands on it.
+ */
+async function existingTwin(venueId: string, source: string, dedupeKey: string, title: string, starts: string[]) {
+  if (!starts.length) return null;
+  const { data: same } = await supabase.from("events").select("id").eq("dedupe_key", dedupeKey).maybeSingle();
+  if (same) return null; // already known under this title
+  const times = starts.map(Date.parse).filter((t) => !Number.isNaN(t));
+  if (!times.length) return null;
+  const { data, error } = await supabase
+    .from("event_occurrences")
+    .select("starts_at, event:events!inner(id, venue_id, title, status, dedupe_key, created_at, source)")
+    .eq("event.venue_id", venueId)
+    .eq("event.status", "active")
+    // Same source only: the page is the authority for its own events' dates, so merging into
+    // another source's event could drop dates only that source lists (duplicateDates covers those).
+    .eq("event.source", source)
+    .gte("starts_at", new Date(Math.min(...times) - SAME_TIME_MS).toISOString())
+    .lte("starts_at", new Date(Math.max(...times) + SAME_TIME_MS).toISOString())
+    .limit(2000);
+  if (error || !data) return null; // never block an import on the dedup check
+  const twins = (data as unknown as { starts_at: string; event: { title: string; dedupe_key: string; created_at: string } }[])
+    .filter((o) => times.some((t) => Math.abs(Date.parse(o.starts_at) - t) <= SAME_TIME_MS) && similarTitles(title, o.event.title))
+    .map((o) => o.event)
+    .sort((a, b) => a.created_at.localeCompare(b.created_at));
+  return twins[0] ? { dedupe_key: twins[0].dedupe_key, title: twins[0].title } : null;
 }
 
 /**
@@ -77,7 +102,7 @@ async function duplicateDates(venueId: string, eventId: string, title: string, s
     .limit(2000);
   if (error || !data) return new Set(); // never block an import on the dedup check
   const others = (data as unknown as { starts_at: string; event: { title: string; status: string } }[])
-    .filter((o) => o.event.status === "active" && sameTitle(title, o.event.title))
+    .filter((o) => o.event.status === "active" && similarTitles(title, o.event.title))
     .map((o) => Date.parse(o.starts_at));
   return new Set(fresh.filter((s) => others.some((t) => Math.abs(t - Date.parse(s)) <= HOUR)));
 }
@@ -119,14 +144,22 @@ export async function storeExtractedEvents(opts: {
   let occurrenceCount = 0;
 
   for (const ev of opts.events) {
-    const dedupeKey = `${opts.venueId}:${slugify(ev.title)}`;
+    let dedupeKey = `${opts.venueId}:${slugify(ev.title)}`;
+    let title = ev.title;
+    const twin = await existingTwin(opts.venueId, opts.source, dedupeKey, ev.title, ev.occurrences.map((o) => o.start));
+    if (twin) {
+      // Same event reworded: update the one we have and keep its title, so the card stays stable.
+      log(`  ~ "${ev.title}" is "${twin.title}" reworded; updating that event`);
+      dedupeKey = twin.dedupe_key;
+      title = twin.title;
+    }
 
     const { data: eventRow, error: evErr } = await supabase
       .from("events")
       .upsert(
         {
           venue_id: opts.venueId,
-          title: ev.title,
+          title,
           description: ev.description,
           category: ev.category,
           price: ev.price,

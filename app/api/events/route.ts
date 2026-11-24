@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { demoNearby, isDemoMode } from "@/lib/demo";
 import { hasLocalEvents, localNearby } from "@/lib/localEvents";
 import { isRun } from "@/lib/format";
+import { similarTitles, SAME_TIME_MS } from "@/lib/dedupe";
 
 // GET /api/events?lat=..&lng=..&radius=15&days=30
 // Returns upcoming event occurrences near a point, sorted by time.
@@ -70,13 +71,39 @@ function dropRepeatedRuns(occurrences: any[]) {
 }
 
 /**
+ * One card per show: different events at the same venue starting within an hour with similar
+ * titles ("David Benoit: A Charlie Brown Christmas" and "... (with Courtney Fortune)") are the
+ * same show listed twice; the better-ranked listing is kept. A safety net for duplicates already
+ * stored; imports now merge them (lib/ingest.ts) and scripts/merge-dupes.ts cleans old ones.
+ */
+function dropTwinEvents(occurrences: any[]) {
+  const byVenue = new Map<string, any[]>();
+  for (const o of occurrences) (byVenue.get(o.venue_id) ?? byVenue.set(o.venue_id, []).get(o.venue_id)!).push(o);
+  const drop = new Set<string>();
+  for (const list of byVenue.values()) {
+    if (list.length < 2) continue;
+    const ranked = [...list].sort((a, b) => (b.traffic_score ?? 0) - (a.traffic_score ?? 0));
+    const kept: any[] = [];
+    for (const o of ranked) {
+      const t = Date.parse(o.starts_at);
+      const twin = kept.find(
+        (k) => k.event_id !== o.event_id && Math.abs(Date.parse(k.starts_at) - t) <= SAME_TIME_MS && similarTitles(k.title, o.title),
+      );
+      if (twin) drop.add(o.occurrence_id);
+      else kept.push(o);
+    }
+  }
+  return drop.size ? occurrences.filter((o) => !drop.has(o.occurrence_id)) : occurrences;
+}
+
+/**
  * Group occurrences by event + date (LA timezone).
  * For each group, keep the next occurrence and add occurrence_count_today.
  */
 function groupByEventAndDate(all: any[]) {
   const tz = "America/Los_Angeles";
   const groups = new Map<string, any[]>();
-  const occurrences = dropRepeatedRuns(all);
+  const occurrences = dropTwinEvents(dropRepeatedRuns(all));
 
   for (const occ of occurrences) {
     // Format: YYYY-MM-DD in LA timezone
