@@ -59,8 +59,20 @@ async function main() {
       .map((e, i) => `${i}. Title: ${e.title}\n   Venue: ${e.venue?.name ?? ""}\n   Category: ${e.category ?? ""} · Tags: ${(e.tags ?? []).join(", ")}\n   Description: ${e.description}`)
       .join("\n\n");
     let out: { taglines?: { i: number; tagline: string | null }[] } = {};
+    let reply: string | null = null;
+    // If the model server is down (e.g. restarting after running out of memory), wait for it
+    // rather than racing through the remaining batches.
+    for (let attempt = 0; reply === null; attempt++) {
+      try {
+        reply = await complete({ system: SYSTEM, prompt, json: true, maxTokens: 1500, temperature: 0.2, provider });
+      } catch (e) {
+        if (attempt >= 8) throw new Error(`model unreachable after retries: ${(e as Error).message}`);
+        console.warn(`  model unreachable (${(e as Error).message}); retrying in 15s`);
+        await new Promise((r) => setTimeout(r, 15000));
+      }
+    }
     try {
-      out = JSON.parse(extractJson(await complete({ system: SYSTEM, prompt, json: true, maxTokens: 1500, temperature: 0.2, provider })));
+      out = JSON.parse(extractJson(reply));
     } catch (e) {
       console.warn(`  batch ${b / BATCH + 1}: unusable reply (${(e as Error).message}); skipped`);
       continue;
