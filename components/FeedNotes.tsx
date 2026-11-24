@@ -37,15 +37,13 @@ export function FeedNote({ kind, n, area }: { kind: FeedNoteKind; n: number; are
       tickets={[
         { label: "I'm a curator", emoji: "🙋", type: "instagram", mine: true },
         { label: "Suggest one", emoji: "📸", type: "instagram" },
-        { label: "I'm a curator", emoji: "🙋", type: "instagram", mine: true },
-        { label: "Suggest one", emoji: "📸", type: "instagram" },
       ]}
     />
   );
 }
 
-/** Tickets down the sources flyer, top to bottom. */
-const TICKET_ORDER: SourceType[] = ["instagram", "newsletter", "website", "instagram", "newsletter", "website"];
+/** Tickets down the sources flyer, top to bottom: one of each. */
+const TICKET_ORDER: SourceType[] = ["instagram", "newsletter", "website"];
 type Ticket = { label: string; emoji: string; type: SourceType; mine?: boolean };
 
 function AskCard({ eyebrow, title, body, tickets }: { eyebrow: string; title: string; body: string; tickets: Ticket[] }) {
@@ -61,8 +59,7 @@ function AskCard({ eyebrow, title, body, tickets }: { eyebrow: string; title: st
       {/* pb-4 keeps the last ticket clear of the next poster's overlap (.flyer-stack). */}
       <ul className="-mt-6 flex w-[122px] shrink-0 flex-col border-l-[1.5px] border-dashed border-black/40 pb-4 sm:w-[150px]">
         {tickets.map((t, i) => (
-          // Wide screens: one set of tickets is plenty (the flyer is short there).
-          <li key={i} className={`flex flex-1 ${i ? "border-t-[1.5px] border-dashed border-black/35" : ""} ${i >= tickets.length / 2 ? "sm:hidden" : ""}`}>
+          <li key={i} className={`flex flex-1 ${i ? "border-t-[1.5px] border-dashed border-black/35" : ""}`}>
             <button
               type="button"
               onClick={() => setOpen(t)}

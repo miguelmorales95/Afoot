@@ -6,8 +6,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { useApp } from "./AppProvider";
 import { suggestMailto } from "@/lib/site";
 
-// Scrolled this far down, the header gets out of the way; it comes back only after a real scroll
-// up (someone who wants it), or near the top. Events get the screen: success is people going out.
+// On phones, scrolled this far down, the header gets out of the way; it comes back only after a
+// real scroll up (someone who wants it), or near the top. Events get the screen: success is people
+// going out. Wider screens have room, so it stays.
 const HIDE_AFTER = 80, SHOW_AFTER_UP = 250;
 
 /** Hides on scroll down, returns on a deliberate scroll up. Sets --header-offset for sticky bars. */
@@ -15,7 +16,9 @@ function useAutoHide() {
   const [hidden, setHidden] = useState(false);
   useEffect(() => {
     let last = window.scrollY, up = 0, ticking = false;
+    const phone = window.matchMedia("(max-width: 639px)");
     const onScroll = () => {
+      if (!phone.matches) { setHidden(false); return; }
       if (ticking) return;
       ticking = true;
       requestAnimationFrame(() => {
@@ -31,9 +34,19 @@ function useAutoHide() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
   const ref = useRef<HTMLElement>(null);
+  // The day bar sits right under the header. Re-measured whenever the header's size changes (fonts
+  // loading, the sign-in button), and 1 px of overlap so no sliver of posters shows between them.
   useEffect(() => {
-    const h = ref.current?.offsetHeight;
-    document.documentElement.style.setProperty("--header-offset", hidden ? "0px" : h ? `${h}px` : "3.5rem");
+    const el = ref.current;
+    const set = () => {
+      const h = el?.getBoundingClientRect().height;
+      document.documentElement.style.setProperty("--header-offset", hidden ? "0px" : h ? `${Math.floor(h) - 1}px` : "3.5rem");
+    };
+    set();
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(set);
+    ro.observe(el);
+    return () => ro.disconnect();
   }, [hidden]);
   return { hidden, ref };
 }
@@ -43,7 +56,7 @@ export default function SiteHeader() {
   return (
     <header
       ref={ref}
-      className={`sticky top-0 z-30 border-b border-white/10 bg-[#2b2119]/90 backdrop-blur transition-transform duration-200 motion-reduce:transition-none ${hidden ? "-translate-y-full" : ""}`}
+      className={`sticky top-0 z-30 border-b border-white/10 bg-[#2b2119] backdrop-blur sm:bg-[#2b2119]/90 transition-transform duration-200 motion-reduce:transition-none ${hidden ? "-translate-y-full" : ""}`}
     >
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
         <Link href="/" className="flex items-center gap-2">

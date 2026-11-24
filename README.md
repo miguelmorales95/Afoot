@@ -142,7 +142,7 @@ Optional, privacy-first social layer:
   Only the pinned header carries the filter and map buttons.
 - **Cards are day-glo show posters** (Colby-style, see `DESIGN.md`): time block, a one-line schedule
   under it ("MON, WED UNTIL 1/6", from the AI's `schedule_label` + last date), a static street map
-  that opens a full map with directions, then title, venue, tags, a 🅿️ Parking / No Parking chip
+  that opens a full map with directions, then title, venue, tags, a "Parking" / "No parking" tag
   when known, "I'm going" and ⚑.
 - **Phones get keywords, not a paragraph:** up to 6 bold words from the AI `tagline` (or the
   description) minus filler and anything the card already shows (`briefWords` in `lib/format.ts`).

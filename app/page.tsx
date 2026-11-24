@@ -540,7 +540,7 @@ export default function Home() {
           const colors = posterColors(items.slice(0, limit).map((it) => (it.kind === "one" ? it.ev : it.evs[0])));
           return (
             <div key={key} id={`day-${key}`} className="mb-8 scroll-mt-14">
-              <div className="sticky top-[var(--header-offset,3.5rem)] z-10 transition-[top] duration-200 motion-reduce:transition-none -mx-4 flex items-center justify-between gap-3 bg-[#2b2119]/95 px-4 py-2 backdrop-blur">
+              <div className="sticky top-[var(--header-offset,3.5rem)] z-10 transition-[top] duration-200 motion-reduce:transition-none -mx-4 flex items-center justify-between gap-3 bg-[#2b2119] px-4 py-2 backdrop-blur sm:bg-[#2b2119]/95">
                 <h2 className="flex min-w-0 items-baseline gap-2">
                   <span className="font-poster truncate text-[28px] uppercase leading-none" style={{ color: PAPER[di % PAPER.length] }}>
                     {formatDayLabel(startedBefore(dayEvents[0]) ? new Date().toISOString() : dayEvents[0].starts_at)}
@@ -847,15 +847,14 @@ const EventCard = memo(function EventCard({ ev, feedback, featured, paper, wide,
         {keywords.length > 0 && !ev.voice_line && !compact && <GistLine words={keywords} />}
         {((!!ev.tags?.length && !compact) || parking) && (
           <div className="mt-2 flex flex-wrap gap-1">
-            {/* Only when we know; otherwise assume street parking. */}
+            {/* Only when we know; otherwise assume street parking. A plain tag like the rest: people read
+                it as part of the event, even though it comes from the venue. */}
             {parking && (
               <span
                 title={ev.venue_parking ?? (parking === "no-parking" ? "Visitors say it's hard to park" : undefined)}
-                className={`rounded-full px-2 py-0.5 text-xs font-extrabold ${
-                  parking === "parking" ? "bg-[#111] text-[var(--paper)]" : "border-[1.5px] border-dashed border-[#111] text-[#111]"
-                }`}
+                className="rounded-full border-[1.5px] border-[#111]/70 px-2 py-0.5 text-xs font-bold text-[#111]"
               >
-                {parking === "parking" ? "🅿️ Parking" : "No Parking"}
+                {parking === "parking" ? "Parking" : "No parking"}
               </span>
             )}
             {(compact ? [] : ev.tags ?? []).slice(0, 4).map((t) => (
@@ -1020,8 +1019,8 @@ const LineupCard = memo(function LineupCard({ id, evs, paper, wide, open, onTogg
         </ul>
         {parking && (
           <div className="mt-2 flex flex-wrap gap-1">
-            <span className={`rounded-full px-2 py-0.5 text-xs font-extrabold ${parking === "parking" ? "bg-[#111] text-[var(--paper)]" : "border-[1.5px] border-dashed border-[#111] text-[#111]"}`}>
-              {parking === "parking" ? "🅿️ Parking" : "No Parking"}
+            <span className="rounded-full border-[1.5px] border-[#111]/70 px-2 py-0.5 text-xs font-bold text-[#111]">
+              {parking === "parking" ? "Parking" : "No parking"}
             </span>
           </div>
         )}
