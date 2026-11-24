@@ -14,17 +14,23 @@ const verbose = process.argv.includes("--verbose");
 async function dedupeOccurrences() {
   console.log(`🔍 Finding duplicate occurrences... ${dryRun ? "(DRY RUN)" : ""}\n`);
 
-  // Get all occurrences grouped by event + start time
-  const { data: occs, error } = await supabase
-    .from("event_occurrences")
-    .select("id, event_id, starts_at, created_at")
-    .order("event_id")
-    .order("starts_at")
-    .order("created_at");
-
-  if (error || !occs) {
-    console.error("Error fetching occurrences:", error);
-    process.exit(1);
+  // Every page: the database returns at most 1,000 rows per request.
+  const occs: { id: string; event_id: string; starts_at: string; created_at: string }[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase
+      .from("event_occurrences")
+      .select("id, event_id, starts_at, created_at")
+      .order("event_id")
+      .order("starts_at")
+      .order("created_at")
+      .order("id")
+      .range(from, from + 999);
+    if (error) {
+      console.error("Error fetching occurrences:", error);
+      process.exit(1);
+    }
+    occs.push(...(data ?? []));
+    if (!data || data.length < 1000) break;
   }
 
   const byEventAndTime = new Map<string, any[]>();
