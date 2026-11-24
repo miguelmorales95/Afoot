@@ -8,6 +8,8 @@ import { HEADS_UP_REASONS, REPORT_REASONS } from "@/lib/types";
 //   { type: "report",   eventId, occurrenceId?, reason, note?, deviceId }
 //   { type: "heads_up", eventId, occurrenceId?, reason, deviceId }
 //   { type: "check",    eventId, occurrenceId?, field, answer: yes|no|unsure, deviceId }
+//   { type: "check",    eventId, occurrenceId?, field: "starts_at", answer: "value", value: "HH:MM", deviceId }
+//     (a start time for a "TIME TBA" event; matching answers from two devices set it)
 // The device id is a random value the browser keeps; we store only a salted hash of it,
 // never an IP. Community rules (thresholds below) act immediately; everything also lands
 // in the /admin queue.
@@ -19,6 +21,9 @@ const CANCEL_AFTER = 2; // distinct devices saying a date is cancelled
 const CONFIRM_AFTER = 2; // distinct "yes" answers that confirm an uncertain detail
 const DAILY_LIMIT = 30; // feedback per device per day
 const FIELDS = ["starts_at", "date", "address", "price"];
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+// The time extraction uses when a page gives none (lib/extract.ts).
+const PLACEHOLDER = "19:00";
 
 const salt = process.env.DEVICE_HASH_SALT || "afoot-dev-only-salt";
 const hashDevice = (id: string) => createHash("sha256").update(`${salt}:${id}`).digest("hex");
@@ -38,7 +43,8 @@ export async function POST(req: NextRequest) {
   const valid =
     (type === "report" && reason in REPORT_REASONS) ||
     (type === "heads_up" && reason in HEADS_UP_REASONS) ||
-    (type === "check" && FIELDS.includes(field) && ["yes", "no", "unsure"].includes(answer));
+    (type === "check" && FIELDS.includes(field) && ["yes", "no", "unsure"].includes(answer)) ||
+    (type === "check" && field === "starts_at" && answer === "value" && HHMM.test(body?.value));
   if (!valid) return NextResponse.json({ error: "Unknown feedback" }, { status: 400 });
 
   const device_hash = hashDevice(deviceId);
@@ -53,6 +59,18 @@ export async function POST(req: NextRequest) {
 
   const { data: event } = await supabase.from("events").select("id, uncertain_fields").eq("id", eventId).single();
   if (!event) return NextResponse.json({ error: "Event not found" }, { status: 404 });
+
+  if (type === "check" && answer === "value") {
+    const value: string = body.value;
+    const { error } = await supabase.from("event_checks")
+      .upsert({ event_id: eventId, occurrence_id: occurrenceId, field, answer, value, device_hash }, { onConflict: "event_id,field,device_hash" });
+    if (error) return failed(error.message);
+    const { data: answers } = await supabase.from("event_checks").select("value, device_hash").eq("event_id", eventId).eq("field", field).eq("answer", "value");
+    const agree = distinct((answers || []).filter((a) => a.value === value));
+    if (agree < CONFIRM_AFTER) return NextResponse.json({ ok: true });
+    await confirmStartTime(eventId, value, event.uncertain_fields || []);
+    return NextResponse.json({ ok: true, confirmed: field });
+  }
 
   if (type === "check") {
     const { error } = await supabase.from("event_checks")
@@ -101,6 +119,36 @@ export async function POST(req: NextRequest) {
     }
   }
   return NextResponse.json({ ok: true });
+}
+
+/**
+ * Visitors agreed on a start time: save it on the event (the nightly import uses it in place of
+ * its placeholder), clear the "TIME TBA" flag, and move upcoming placeholder dates to that time.
+ */
+async function confirmStartTime(eventId: string, hhmm: string, uncertain: string[]) {
+  await supabase.from("events").update({
+    confirmed_time: hhmm,
+    uncertain_fields: uncertain.filter((f) => f !== "starts_at"),
+    verified_by: "community",
+    verified_at: new Date().toISOString(),
+  }).eq("id", eventId);
+  const { data: occs } = await supabase.from("event_occurrences").select("id, starts_at").eq("event_id", eventId).gte("starts_at", new Date().toISOString());
+  for (const o of occs ?? []) {
+    if (laClock(o.starts_at) !== PLACEHOLDER) continue;
+    await supabase.from("event_occurrences").update({ starts_at: laIso(laDate(o.starts_at), hhmm) }).eq("id", o.id);
+  }
+}
+
+const LA = "America/Los_Angeles";
+const laDate = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: LA }).format(new Date(iso));
+const laClock = (iso: string) =>
+  new Intl.DateTimeFormat("en-GB", { timeZone: LA, hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(iso));
+/** "2026-11-27" + "20:30" in LA time → ISO with the right offset (handles daylight saving). */
+function laIso(date: string, hhmm: string): string {
+  const guess = new Date(`${date}T${hhmm}:00Z`);
+  const off = new Intl.DateTimeFormat("en-US", { timeZone: LA, timeZoneName: "longOffset" })
+    .formatToParts(guess).find((p) => p.type === "timeZoneName")?.value.replace("GMT", "") || "-08:00";
+  return new Date(`${date}T${hhmm}:00${off}`).toISOString();
 }
 
 function failed(message: string) {

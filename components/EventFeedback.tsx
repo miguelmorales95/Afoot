@@ -5,6 +5,7 @@
 // tips after an event (parking, crowds, great vibe). Each browser gets a random id
 // (stored only in localStorage); the server keeps just a salted hash of it.
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   HEADS_UP_REASONS, REPORT_REASONS,
   type HeadsUpReason, type NearbyEvent, type ReportReason, type UncertainField,
@@ -38,7 +39,7 @@ function remember(key: string) {
   try { localStorage.setItem(ANSWERED_KEY, JSON.stringify({ ...answered(), [key]: true })); } catch { /* ignore */ }
 }
 
-async function send(body: object): Promise<{ ok?: boolean; error?: string; hidden?: boolean; cancelled?: boolean }> {
+async function send(body: object): Promise<{ ok?: boolean; error?: string; hidden?: boolean; cancelled?: boolean; confirmed?: string }> {
   const res = await fetch("/api/feedback", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -66,6 +67,46 @@ export function UnconfirmedBadges({ ev }: { ev: NearbyEvent }) {
   );
 }
 
+const laClock = (iso: string) =>
+  new Intl.DateTimeFormat("en-GB", { timeZone: "America/Los_Angeles", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(iso));
+
+/** Asks for a start time. On <body>: a field inside a card would follow the card's link. */
+function TimeDialog({ title, onSend, onClose }: { title: string; onSend: (hhmm: string) => void; onClose: () => void }) {
+  const [value, setValue] = useState("");
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center" onClick={(e) => { e.stopPropagation(); onClose(); }}>
+      <form
+        role="dialog"
+        aria-modal="true"
+        aria-label="Add the start time"
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={(e) => { e.preventDefault(); e.stopPropagation(); if (value) onSend(value); }}
+        className="w-full max-w-sm space-y-4 rounded-t-3xl border border-white/10 bg-[#2b2119] p-5 pb-8 text-white sm:rounded-3xl"
+      >
+        <p className="text-sm text-white/70">When does <span className="font-semibold text-white">{title}</span> start?</p>
+        <input
+          type="time"
+          required
+          autoFocus
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-lg text-white outline-none focus:border-[#fff23a]/60"
+        />
+        <div className="flex gap-2">
+          <button type="button" onClick={onClose} className="flex-1 rounded-full border border-white/15 px-4 py-2.5 text-sm font-semibold text-white/80 hover:bg-white/10">
+            Cancel
+          </button>
+          <button type="submit" disabled={!value} className="flex-1 rounded-full bg-[#fff23a] px-4 py-2.5 text-sm font-extrabold text-[#111] disabled:opacity-40">
+            Send
+          </button>
+        </div>
+        <p className="text-[11px] text-white/40">No account needed. Once two people give the same time, it shows for everyone.</p>
+      </form>
+    </div>,
+    document.body,
+  );
+}
+
 function question(ev: NearbyEvent, field: UncertainField): string {
   if (field === "starts_at") return `Does this start at ${formatTime(ev.starts_at)}?`;
   if (field === "date") return `Is this happening on ${formatShortDate(ev.starts_at)}?`;
@@ -88,6 +129,17 @@ export default function EventFeedback({ ev, enabled, lead }: { ev: NearbyEvent; 
     const done = answered();
     setAskField(ev.uncertain_fields?.find((f) => !done[`${ev.event_id}:${f}`]) ?? null);
   }, [enabled, ev.event_id, ev.uncertain_fields, ev.cancelled]);
+
+  // "TIME TBA": the stored time is the 7 PM placeholder, so ask for the time instead of yes/no.
+  const tba = askField === "starts_at" && laClock(ev.starts_at) === "19:00";
+  const [timeOpen, setTimeOpen] = useState(false);
+  const sendTime = async (hhmm: string) => {
+    setTimeOpen(false);
+    remember(`${ev.event_id}:starts_at`);
+    setAskField(null);
+    const r = await send({ type: "check", eventId: ev.event_id, occurrenceId: ev.occurrence_id, field: "starts_at", answer: "value", value: hhmm });
+    setThanks(r.error || (r.confirmed ? "Thanks! That's now the start time." : "Thanks! Once someone else confirms it, it'll show for everyone."));
+  };
 
   const check = async (e: React.MouseEvent, answer: "yes" | "no" | "unsure") => {
     stop(e);
@@ -124,7 +176,22 @@ export default function EventFeedback({ ev, enabled, lead }: { ev: NearbyEvent; 
         </div>
       )}
 
-      {askField && (
+      {askField && tba && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl bg-amber-500/5 px-3 py-2 text-xs text-amber-200 ring-1 ring-amber-500/15">
+          <span>Know when this starts?</span>
+          <button type="button" onClick={(e) => { stop(e); setTimeOpen(true); }}
+            className="rounded-full bg-white/10 px-2.5 py-0.5 font-medium text-white/80 hover:bg-white/20">
+            Add the time
+          </button>
+          <button type="button" onClick={(e) => check(e, "unsure")}
+            className="rounded-full bg-white/10 px-2.5 py-0.5 font-medium text-white/80 hover:bg-white/20">
+            Not sure
+          </button>
+        </div>
+      )}
+      {timeOpen && <TimeDialog title={ev.title} onSend={sendTime} onClose={() => setTimeOpen(false)} />}
+
+      {askField && !tba && (
         <div className="flex flex-wrap items-center gap-2 rounded-xl bg-amber-500/5 px-3 py-2 text-xs text-amber-200 ring-1 ring-amber-500/15">
           <span>{question(ev, askField)}</span>
           {(["yes", "no", "unsure"] as const).map((a) => (

@@ -154,6 +154,16 @@ export async function storeExtractedEvents(opts: {
       title = twin.title;
     }
 
+    // Visitors confirmed a start time the page doesn't give: use it instead of the placeholder.
+    let timeUnknown = !!ev.time_unknown;
+    if (timeUnknown) {
+      const { data: known } = await supabase.from("events").select("confirmed_time").eq("dedupe_key", dedupeKey).maybeSingle();
+      if (known?.confirmed_time) {
+        ev.occurrences = ev.occurrences.map((o) => ({ ...o, start: o.start.replace("T19:00:00", `T${known.confirmed_time}:00`) }));
+        timeUnknown = false;
+      }
+    }
+
     const { data: eventRow, error: evErr } = await supabase
       .from("events")
       .upsert(
@@ -171,7 +181,7 @@ export async function storeExtractedEvents(opts: {
           ...(ev.tagline ? { tagline: ev.tagline } : {}),
           ...(ev.schedule_label ? { schedule_label: ev.schedule_label } : {}),
           // A placeholder time is flagged, so cards say "Time TBA" and visitors are asked to confirm.
-          ...(ev.time_unknown ? { uncertain_fields: ["starts_at"] } : {}),
+          ...(timeUnknown ? { uncertain_fields: ["starts_at"] } : {}),
           source: opts.source,
           dedupe_key: dedupeKey,
           updated_at: new Date().toISOString(),
