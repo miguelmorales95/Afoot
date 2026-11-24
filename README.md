@@ -6,6 +6,7 @@ venue **calendar pages**, **newsletters**, event links people share, and officia
 Ticketmaster feeds, expands recurring events into real dates with an LLM, and shows you what's on
 near you. No login needed to browse. Supported by local sponsors, with no tracking.
 
+Visitors see it as **Light Pole** (code, repo, domain and database still say Afoot).
 LA-focused for now. **Live at https://afoot.somedude.app** (Vercel project `afoot`, deploys from `main`;
 events come from Supabase project `xpqzvmggzhsaggrebxxv`, schema `afoot`).
 
@@ -132,6 +133,26 @@ Optional, privacy-first social layer:
 - **Demo mode** — with no Supabase configured, sign-in/RSVP/requests are simulated in
   `localStorage` so the whole flow is clickable offline.
 
+### What a visitor sees
+
+- **All of LA by default.** No place picked shows every event within 80 km of downtown (no
+  distances); picking a neighborhood, ZIP or "use my location" narrows it to 25 km and collapses the
+  search to one "What's posted around …" line (tap the place to reopen it).
+- **Days, top 15 first.** Each day header pins to the top; "Show 15 more" twice, then "Show all".
+  Only the pinned header carries the filter and map buttons.
+- **Cards are day-glo show posters** (Colby-style, see `DESIGN.md`): time block, a one-line schedule
+  under it ("MON, WED UNTIL 1/6", from the AI's `schedule_label` + last date), a static street map
+  that opens a full map with directions, then title, venue, tags, a 🅿️ Parking / No Parking chip
+  when known, "I'm going" and ⚑.
+- **Phones get keywords, not a paragraph:** up to 6 bold words from the AI `tagline` (or the
+  description) minus filler and anything the card already shows (`briefWords` in `lib/format.ts`).
+- **Lineup cards:** two or more events of the same type at one venue on one day become one card
+  (venue, then each show's time and title); "See all" opens them as same-color cards below.
+- **Types** (multi-select; none picked = everything): Music, Comedy, Classes, Art (art, film,
+  theater), Games (game nights + trivia), Markets, Food.
+- **Map view:** one day by default, ‹ › to step, tap the date for a range (tap-tap or drag).
+- **TIME TBA:** when a page gives no time, extraction flags it instead of showing its 7 PM placeholder.
+
 ### Event feedback: flags, tips, and checks
 
 Afoot keeps listings accurate with help from the people using it. No account is needed.
@@ -145,6 +166,9 @@ Afoot keeps listings accurate with help from the people using it. No account is 
 - **One-tap checks** on uncertain details ("Does this start at 8pm?"). Events carry a
   `confidence` and `uncertain_fields`; **2 "yes" answers** from different devices confirm a
   detail, and 2 "no" answers send it to `/admin`.
+- **Start times for TIME TBA events:** "Know when this starts?" opens a time picker. When 2 devices
+  give the same time it becomes `events.confirmed_time`, the TBA clears, upcoming placeholder dates
+  move to it, and the nightly import uses it instead of its placeholder.
 
 Each browser keeps a random id in localStorage; the server stores only a salted hash
 (`DEVICE_HASH_SALT`), never an IP. Each device can send 30 pieces of feedback a day. Flagged
@@ -176,13 +200,33 @@ Needs the repo secrets `RESEND_API_KEY` and `FOUNDER_EMAIL`. Preview without sen
 
 ### Traffic ranking (`npm run rank`, nightly, no AI)
 
-Each day on the site shows its top 25 events by `events.traffic_score` (View more adds 25; the
-third click shows all). The score is plain arithmetic in `lib/rank.ts`: the venue's draw (from its
+Each day on the site shows its top 15 cards by `events.traffic_score` ("Show 15 more" twice, then
+"Show all"; a lineup card counts as one). The score is plain arithmetic in `lib/rank.ts`: the venue's draw (from its
 Wikipedia page views, refreshed weekly; schools and libraries capped at 40; `draw_source =
 'manual'` is never overwritten), category, one-off vs. weekly, weekend dates, free, title keywords,
 and taps. Taps and card views are counted per event per day in `event_daily` (counts only, sent in
 batches with sendBeacon to `/api/events/seen`); a jump in taps week over week adds a "taking off"
 bonus. Preview without saving: `npm run rank -- --dry`.
+
+### Duplicates
+
+Same venue, start within an hour, and titles that share their meaningful words are the same
+show (`lib/dedupe.ts`). Imports update the existing event instead of adding a reworded copy (the
+AI rewords titles night to night), runs like "through Dec 24" are stored once, the feed hides any
+twins that slip through, and `npm run merge-dupes` / `npm run dedupe-occurrences` clean stored ones
+(run `--dry-run` first). What we tried and learned: `docs/discovery-strategy/dedup-research-and-learnings.md`.
+
+### Backfills and one-off scripts
+
+| Command | What it does |
+|---|---|
+| `npm run taglines` | AI tagline for upcoming events without one (phone keywords) |
+| `npm run schedule-labels` | Short schedule label ("TUE, THU") for recurring events without one |
+| `npm run venue-parking` | Parking notes from OpenStreetMap lots/garages within a block (blank notes only) |
+| `npm run recategorize-art` | Moves art/film/theater events into the `art` type (one-off, done 2026-11-24) |
+| `npm run scan:inbox` | Scan a Google account for venues and sources to track (`docs/discovery-strategy/INBOX-SCAN.md`) |
+
+They use `LLM_PROVIDER` (local Ollama by default; add `--anthropic` where offered for Claude).
 
 ### JS-rendered sites (Zebulon, etc.)
 
@@ -512,7 +556,10 @@ These are deliberate MVP cuts, roughly in priority order:
 5. **Candidate + unmatched-newsletter review is manual** (by design, to keep quality high).
    `promote --auto <score>` auto-approves high-confidence venue finds; unmatched newsletters sit
    in `inbound_emails` until you add a sender mapping.
-6. **Local Ollama is slow without a GPU** (minutes per long page): use Claude for bulk ingests.
+6. **Local Ollama** (qwen2.5 7B) now runs on this PC's AMD GPU (ROCm), installed on the PNY drive
+   (`/run/media/migs/PNY/ollama`, user service waits for the drive). Fine for taglines and labels;
+   batch prompts can scramble answers between items, so the scripts send one at a time or guard
+   the output. Use Claude for bulk ingests and inbox scans.
 7. **Calendar feeds read iCal and Localist only.** RSS and other JSON calendars are listed as
    calendar pages (read by AI) until a reader is added.
 
