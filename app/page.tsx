@@ -18,6 +18,7 @@ import AdUnit from "@/components/AdUnit";
 import GoingButton from "@/components/GoingButton";
 import EventFeedback, { UnconfirmedBadges } from "@/components/EventFeedback";
 import VenueMiniMap from "@/components/VenueMiniMap";
+import VenueMapModal from "@/components/VenueMapModal";
 import DateRangePicker from "@/components/DateRangePicker";
 import { LAUNCH_AREAS, type LaunchArea } from "@/lib/areas";
 import { areaForLocation, campaignsFor, type LiveCampaign } from "@/lib/ads";
@@ -599,6 +600,8 @@ function EventCard({ ev, feedback, featured, paper }: { ev: NearbyEvent; feedbac
   const more = ev.occurrence_count_remaining ?? 0;
   const keywords = useMemo(() => briefWords(ev), [ev]);
   const parking = parkingStatus(ev);
+  const [mapOpen, setMapOpen] = useState(false);
+  const closeMap = useCallback(() => setMapOpen(false), []);
   const body = (
     <div ref={cardRef} className="flyer flex gap-3 px-4 pb-6 pt-6 sm:gap-4" style={look}>
       <div className="flex w-[104px] shrink-0 flex-col gap-2 sm:w-32">
@@ -623,7 +626,15 @@ function EventCard({ ev, feedback, featured, paper }: { ev: NearbyEvent; feedbac
         {ev.is_recurring && ev.schedule_label && (
           <p className="text-center text-[13px] font-extrabold uppercase leading-tight tracking-wide text-[#111]">{ev.schedule_label}</p>
         )}
-        <VenueMiniMap lat={ev.venue_lat} lng={ev.venue_lng} venue={ev.venue_name} />
+        <button
+          type="button"
+          aria-label={`Bigger map of ${ev.venue_name}`}
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMapOpen(true); }}
+          className="block w-full cursor-zoom-in"
+        >
+          <VenueMiniMap lat={ev.venue_lat} lng={ev.venue_lng} venue={ev.venue_name} />
+        </button>
+        {mapOpen && <VenueMapModal ev={ev} onClose={closeMap} />}
       </div>
       <div className="min-w-0 flex-1">
         <span className="inline-block rounded-full border-2 border-[#111] px-2 py-0.5 text-[11px] font-extrabold uppercase tracking-wide text-[#111]">

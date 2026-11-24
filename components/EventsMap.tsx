@@ -86,9 +86,11 @@ function VenuePopup({ g }: { g: VenueGroup }) {
 export default function EventsMap({
   events,
   center,
+  height = "70vh",
 }: {
   events: NearbyEvent[];
   center: [number, number];
+  height?: string;
 }) {
   const groups = useMemo(() => groupByVenue(events), [events]);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -157,7 +159,7 @@ export default function EventsMap({
   }, [groups]);
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/10" style={{ height: "70vh" }}>
+    <div className="overflow-hidden rounded-2xl border border-white/10" style={{ height }}>
       {failed ? (
         <div className="flex h-full items-center justify-center px-6 text-center text-sm text-white/50">
           This browser can&apos;t draw the map. The list view still shows every event.
