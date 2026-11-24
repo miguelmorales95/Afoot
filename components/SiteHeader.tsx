@@ -11,8 +11,9 @@ export default function SiteHeader() {
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
         <Link href="/" className="flex items-center gap-2">
           <span className="text-xl">📌</span>
-          <span className="font-poster text-[26px] uppercase leading-none">
-            <span className="text-[#fff23a]">Light</span> <span className="text-[#ff5fae]">Pole</span>
+          <span className="sr-only">Light Pole</span>
+          <span className="font-poster text-[26px] uppercase leading-none" aria-hidden>
+            <span className="text-[#fff23a]">Ligh<PoleT /></span> <span className="text-[#ff5fae]">Pole</span>
           </span>
         </Link>
         <nav className="flex items-center gap-2 text-sm text-white/70">
@@ -32,6 +33,28 @@ export default function SiteHeader() {
         </nav>
       </div>
     </header>
+  );
+}
+
+/** The T of LIGHT drawn as an LA wooden power pole: crossarm with insulators, braces, transformer can. */
+function PoleT() {
+  return (
+    <svg viewBox="0 0 22 34" fill="currentColor" className="ml-[0.02em] inline-block h-[0.86em] w-auto align-baseline">
+      {/* insulators on the crossarm, and one on the pole top */}
+      <rect x="1" y="1.4" width="2.2" height="4" rx="1.1" />
+      <rect x="18.8" y="1.4" width="2.2" height="4" rx="1.1" />
+      <rect x="9.9" y="0" width="2.2" height="5" rx="1.1" />
+      {/* crossarm */}
+      <rect x="0" y="4.8" width="22" height="5" rx="0.5" />
+      {/* tapered pole */}
+      <path d="M8.6 3 L13.4 3 L14.2 34 L7.8 34 Z" />
+      {/* braces under the crossarm */}
+      <path d="M3.6 9.4 L8.6 15.4" stroke="currentColor" strokeWidth="2.2" fill="none" />
+      <path d="M18.4 9.4 L13.4 15.4" stroke="currentColor" strokeWidth="2.2" fill="none" />
+      {/* transformer can */}
+      <rect x="14.6" y="17" width="6" height="8.6" rx="2" />
+      <rect x="13.4" y="18.6" width="1.8" height="1.6" />
+    </svg>
   );
 }
 
