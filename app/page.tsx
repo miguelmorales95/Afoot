@@ -524,12 +524,12 @@ export default function Home() {
                   if (it.kind === "one") return [<EventCard key={it.ev.occurrence_id} ev={it.ev} feedback={feedback} paper={colors[i]} wide={!!loc?.all} />];
                   const id = `${key}|${it.key}`;
                   const open = openLineups.has(id);
-                  const base = PAPER.indexOf(colors[i]);
                   return [
                     <LineupCard key={id} evs={it.evs} paper={colors[i]} wide={!!loc?.all} open={open} onToggle={() => toggleLineup(id)} />,
                     ...(open
-                      ? it.evs.map((ev, j) => (
-                          <EventCard key={ev.occurrence_id} ev={ev} feedback={feedback} paper={PAPER[(base + j + 1) % PAPER.length]} wide={!!loc?.all} />
+                      // Same paper as the lineup card, so the opened shows read as one stack.
+                      ? it.evs.map((ev) => (
+                          <EventCard key={ev.occurrence_id} ev={ev} feedback={feedback} paper={colors[i]} wide={!!loc?.all} />
                         ))
                       : []),
                   ];
@@ -870,7 +870,7 @@ function LineupCard({ evs, paper, wide, open, onToggle }: { evs: NearbyEvent[]; 
           </div>
         )}
         <button type="button" onClick={onToggle} aria-expanded={open} className="going-btn mt-3 rounded-full">
-          {open ? "Show less" : `See all ${evs.length} shows`}
+          {open ? "Show less" : "See all"}
         </button>
       </div>
     </div>
