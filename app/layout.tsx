@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Anton } from "next/font/google";
 import Link from "next/link";
 import { Analytics } from "@vercel/analytics/next";
 import { suggestMailto } from "@/lib/site";
@@ -23,9 +24,12 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
+// Heavy condensed gothic, after the wood type on Colby show posters. Served from this site.
+const poster = Anton({ weight: "400", subsets: ["latin"], variable: "--font-poster", display: "swap" });
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={poster.variable}>
       <body className="min-h-screen">
         <AppProvider>
           <SiteHeader />

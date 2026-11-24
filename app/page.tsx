@@ -340,10 +340,10 @@ export default function Home() {
           <button
             onClick={() => setHeroOpen(true)}
             aria-label={`Change place (now ${placeName(loc)})`}
-            className="text-left text-xl font-bold tracking-tight sm:text-2xl"
+            className="font-poster text-left text-[26px] uppercase leading-tight sm:text-3xl"
           >
             What&apos;s posted around{" "}
-            <span className="whitespace-nowrap text-[#ffe45c] underline decoration-[#ffe45c]/40 underline-offset-4">
+            <span className="whitespace-nowrap text-[#fff23a] underline decoration-[#fff23a]/50 decoration-2 underline-offset-4">
               {placeName(loc)}
               <span className="ml-1 text-base text-[#ffe45c]/70" aria-hidden>▾</span>
             </span>
@@ -438,25 +438,32 @@ export default function Home() {
       {!loading && view === "list" && featured.length > 0 && (
         <div className="mb-8">
           <h2 className="py-2 text-sm font-semibold uppercase tracking-wider text-white/40">Featured</h2>
-          <div className="mt-2 space-y-3">
-            {featured.map(({ ev, campaign }) => (
-              <EventCard key={ev.occurrence_id} ev={ev} feedback={feedback} featured={campaign} />
-            ))}
+          <div className="flyer-stack mt-2">
+            {(() => {
+              const colors = posterColors(featured.map((f) => f.ev));
+              return featured.map(({ ev, campaign }, i) => (
+                <EventCard key={ev.occurrence_id} ev={ev} feedback={feedback} featured={campaign} paper={colors[i]} />
+              ));
+            })()}
           </div>
         </div>
       )}
 
       {!loading &&
         view === "list" &&
-        grouped.map(([key, dayEvents]) => {
+        grouped.map(([key, dayEvents], di) => {
           const limit = shown[key] ?? PAGE;
           const more = dayEvents.length - limit;
+          const shownEvents = dayEvents.slice(0, limit);
+          const colors = posterColors(shownEvents);
           return (
             <div key={key} id={`day-${key}`} className="mb-8 scroll-mt-14">
-              <div className="sticky top-14 z-10 -mx-4 flex items-center justify-between gap-3 bg-[#2b2119]/90 px-4 py-2 backdrop-blur">
-                <h2 className="text-sm font-semibold uppercase tracking-wider text-white/40">
-                  {formatDayLabel(startedBefore(dayEvents[0]) ? new Date().toISOString() : dayEvents[0].starts_at)}
-                  <span className="ml-2 normal-case tracking-normal text-white/25">{dayEvents.length} {dayEvents.length === 1 ? "event" : "events"}</span>
+              <div className="sticky top-14 z-10 -mx-4 flex items-center justify-between gap-3 bg-[#2b2119]/95 px-4 py-2 backdrop-blur">
+                <h2 className="flex min-w-0 items-baseline gap-2">
+                  <span className="font-poster truncate text-[28px] uppercase leading-none" style={{ color: PAPER[di % PAPER.length] }}>
+                    {formatDayLabel(startedBefore(dayEvents[0]) ? new Date().toISOString() : dayEvents[0].starts_at)}
+                  </span>
+                  <span className="shrink-0 text-sm font-bold text-white/70">{dayEvents.length} {dayEvents.length === 1 ? "event" : "events"}</span>
                 </h2>
                 <div className="flex shrink-0 items-center gap-1.5">
                 {dayEvents.length > PAGE && (
@@ -494,9 +501,9 @@ export default function Home() {
                   </button>
                 </div>
               </div>
-              <div className="mt-2 space-y-3">
-                {dayEvents.slice(0, limit).map((ev) => (
-                  <EventCard key={ev.occurrence_id} ev={ev} feedback={feedback} />
+              <div className="flyer-stack mt-2">
+                {shownEvents.map((ev, i) => (
+                  <EventCard key={ev.occurrence_id} ev={ev} feedback={feedback} paper={colors[i]} />
                 ))}
               </div>
               {more > 0 && (
@@ -591,15 +598,29 @@ const monthDay = (key: string) =>
 
 const placeName = (l: Loc) => (l.label === "your location" ? "you" : l.label);
 
-// Street-flyer paper colors; each event keeps the same color and tilt on every visit.
-const PAPER = ["#ffe45c", "#ff9ec0", "#8ed8f8", "#b9ef9b", "#ffbf73", "#fffdf7"];
-function flyerLook(id: string): React.CSSProperties {
+// Day-glo poster stock (Colby-style); each event keeps the same color and tilt on every visit.
+const PAPER = ["#fff23a", "#ff5fae", "#86f45c", "#ff9a3c", "#62d8ff"];
+const hashId = (id: string) => {
   let h = 0;
   for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return { "--paper": PAPER[h % PAPER.length], "--tilt": `${((h >> 3) % 5 - 2) * 0.35}deg` } as React.CSSProperties;
+  return h;
+};
+function flyerLook(id: string, paper?: string): React.CSSProperties {
+  const h = hashId(id);
+  return { "--paper": paper ?? PAPER[h % PAPER.length], "--tilt": `${((h >> 3) % 5 - 2) * 0.3}deg` } as React.CSSProperties;
+}
+/** Each event's color, nudged to the next one when it would match the poster it overlaps. */
+function posterColors(evs: NearbyEvent[]): string[] {
+  const out: string[] = [];
+  for (const ev of evs) {
+    let i = hashId(ev.event_id) % PAPER.length;
+    if (PAPER[i] === out[out.length - 1]) i = (i + 1) % PAPER.length;
+    out.push(PAPER[i]);
+  }
+  return out;
 }
 
-function EventCard({ ev, feedback, featured }: { ev: NearbyEvent; feedback: boolean; featured?: LiveCampaign }) {
+function EventCard({ ev, feedback, featured, paper }: { ev: NearbyEvent; feedback: boolean; featured?: LiveCampaign; paper?: string }) {
   const cat = categoryMeta(ev.category);
   const seenRef = useSeen(featured?.id ?? null);
   // Views and taps feed the traffic ranking (counts only).
@@ -607,35 +628,38 @@ function EventCard({ ev, feedback, featured }: { ev: NearbyEvent; feedback: bool
   useEffect(() => (cardEl ? observeEventView(cardEl, ev.event_id) : undefined), [cardEl, ev.event_id]);
   const cardRef = useCallback((el: HTMLDivElement | null) => { setCardEl(el); if (featured) seenRef(el); }, [featured, seenRef]);
   const onTap = () => countClick(ev.event_id);
-  const look = flyerLook(ev.event_id);
+  const look = flyerLook(ev.event_id, paper);
+  const more = ev.occurrence_count_remaining ?? 0;
   const body = (
-    <div ref={cardRef} className="flyer flex gap-3 p-4 pt-6 sm:gap-4" style={look}>
-      <div className="flex w-24 shrink-0 flex-col gap-1.5 sm:w-32">
+    <div ref={cardRef} className="flyer flex gap-3 px-4 pb-6 pt-6 sm:gap-4" style={look}>
+      <div className="flex w-[104px] shrink-0 flex-col gap-2 sm:w-32">
+        {/* Inked block with the poster's color knocked out, like a letterpress date line. */}
         <time
           dateTime={ev.starts_at}
-          className="rounded-md bg-black/[0.08] py-1 text-center text-sm font-bold text-[#1a1a1a]"
+          className="font-poster rounded-sm bg-[#111] px-1 py-1.5 text-center leading-none"
+          style={{ color: "var(--paper)" }}
         >
-          {startedBefore(ev) && ev.ends_at
-            ? `Until ${formatShortDate(ev.ends_at)}`
-            : `${formatTime(ev.starts_at)}${
-                (ev as any).occurrence_count_remaining
-                  ? ` (+${(ev as any).occurrence_count_remaining} more time${(ev as any).occurrence_count_remaining === 1 ? "" : "s"})`
-                  : ""
-              }`}
+          {startedBefore(ev) && ev.ends_at ? (
+            <>
+              <span className="block text-[13px] uppercase">Until</span>
+              <span className="block text-[21px] uppercase">{monthDay(dayKey(ev.ends_at))}</span>
+            </>
+          ) : (
+            <>
+              <span className="block text-[23px]">{formatTime(ev.starts_at)}</span>
+              {more > 0 && <span className="mt-1 block text-[13px]">+{more} more time{more === 1 ? "" : "s"}</span>}
+            </>
+          )}
         </time>
         <VenueMiniMap lat={ev.venue_lat} lng={ev.venue_lng} venue={ev.venue_name} />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="flex items-start justify-between gap-3">
-          <h3 className={`text-[17px] font-extrabold leading-snug text-[#1a1a1a] ${ev.cancelled ? "line-through opacity-60" : ""}`}>
-            {ev.title}
-          </h3>
-          <span
-            className="shrink-0 rounded-full border border-black/20 bg-white/60 px-2 py-0.5 text-[11px] font-semibold text-[#1a1a1a]"
-          >
-            {cat.emoji} {cat.label}
-          </span>
-        </div>
+        <span className="inline-block rounded-full border-2 border-[#111] px-2 py-0.5 text-[11px] font-extrabold uppercase tracking-wide text-[#111]">
+          {cat.emoji} {cat.label}
+        </span>
+        <h3 className={`font-poster mt-1.5 text-[26px] leading-[1.03] text-[#111] sm:text-[30px] ${ev.cancelled ? "line-through opacity-60" : ""}`}>
+          {ev.title}
+        </h3>
         {featured && (
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-fuchsia-500/15 px-2 py-0.5 text-[11px] font-medium text-fuchsia-300 ring-1 ring-fuchsia-500/30">
@@ -647,17 +671,17 @@ function EventCard({ ev, feedback, featured }: { ev: NearbyEvent; feedback: bool
             <WhySponsored className="" />
           </div>
         )}
-        <p className="mt-0.5 text-sm font-medium text-black/70">
+        <p className="mt-1 text-[15px] font-bold leading-snug text-[#111]">
           {ev.venue_name} · {formatDistance(ev.distance_km)} away
           {ev.price ? ` · ${ev.price_is_usual ? "usually " : ""}${ev.price}` : ""}
         </p>
-        {(ev as any).last_occurrence_date && (
-          <p className="mt-0.5 text-xs font-medium text-black/60">
-            Until {formatShortDate((ev as any).last_occurrence_date)}
+        {ev.last_occurrence_date && (
+          <p className="mt-0.5 text-sm font-extrabold uppercase tracking-wide text-[#111]">
+            Until {formatShortDate(ev.last_occurrence_date)}
           </p>
         )}
         {(ev.venue_parking || ev.venue_good_to_know) && (
-          <p className="mt-0.5 text-xs text-black/60">
+          <p className="mt-0.5 text-sm font-medium text-black/80">
             {ev.venue_parking ? `🅿️ ${ev.venue_parking}` : ""}
             {ev.venue_parking && ev.venue_good_to_know ? " · " : ""}
             {ev.venue_good_to_know ? `ℹ️ ${ev.venue_good_to_know}` : ""}
@@ -667,22 +691,21 @@ function EventCard({ ev, feedback, featured }: { ev: NearbyEvent; feedback: bool
           <div className="mt-1.5 flex flex-wrap gap-1"><UnconfirmedBadges ev={ev} /></div>
         )}
         {ev.description && (
-          <p className="mt-1 line-clamp-2 text-sm text-black/65">{ev.description}</p>
+          <p className="mt-1.5 line-clamp-2 text-[15px] font-medium leading-snug text-black/85">{ev.description}</p>
         )}
         {ev.tags && ev.tags.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
             {ev.tags.slice(0, 4).map((t) => (
-              <span key={t} className="rounded-full bg-black/[0.08] px-2 py-0.5 text-[11px] text-black/70">
+              <span key={t} className="rounded-full border-[1.5px] border-[#111]/70 px-2 py-0.5 text-xs font-bold text-[#111]">
                 {t}
               </span>
             ))}
           </div>
         )}
         {ev.is_recurring && ev.recurrence_description && (
-          <p className="mt-1 text-xs text-black/55">🔁 {ev.recurrence_description}</p>
+          <p className="mt-1.5 text-sm font-semibold text-black/80">🔁 {ev.recurrence_description}</p>
         )}
-        <GoingButton ev={ev} />
-        <EventFeedback ev={ev} enabled={feedback} />
+        <EventFeedback ev={ev} enabled={feedback} lead={<GoingButton ev={ev} compact />} />
       </div>
     </div>
   );

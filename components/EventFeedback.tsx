@@ -73,7 +73,8 @@ function question(ev: NearbyEvent, field: UncertainField): string {
   return `Is the price ${ev.price || "free"}?`;
 }
 
-export default function EventFeedback({ ev, enabled }: { ev: NearbyEvent; enabled: boolean }) {
+/** `lead` (e.g. the "I'm going" button) shares the row with the report link. */
+export default function EventFeedback({ ev, enabled, lead }: { ev: NearbyEvent; enabled: boolean; lead?: React.ReactNode }) {
   const [menu, setMenu] = useState(false);
   const [note, setNote] = useState("");
   const [thanks, setThanks] = useState<string | null>(null);
@@ -137,10 +138,12 @@ export default function EventFeedback({ ev, enabled }: { ev: NearbyEvent; enable
 
       {thanks && <p className="text-xs text-emerald-300/80">{thanks}</p>}
 
+      {!enabled && lead}
       {enabled && (
-        <div className="flex justify-end">
+        <div className="flex items-center justify-between gap-2">
+          {lead ?? <span />}
           <button type="button" onClick={(e) => { stop(e); setMenu(!menu); setThanks(null); }}
-            className="text-xs text-white/35 hover:text-white/70" aria-expanded={menu} aria-label="Report or rate this event">
+            className="text-sm font-bold text-white/60 underline-offset-2 hover:text-white hover:underline" aria-expanded={menu} aria-label="Report or rate this event">
             ⚑ {started ? "Rate or report" : "Report"}
           </button>
         </div>

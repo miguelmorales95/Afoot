@@ -9,10 +9,10 @@ export default function SiteHeader() {
   return (
     <header className="sticky top-0 z-30 border-b border-white/10 bg-[#2b2119]/90 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-        <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
+        <Link href="/" className="flex items-center gap-2">
           <span className="text-xl">📌</span>
-          <span>
-            Light Pole
+          <span className="font-poster text-[26px] uppercase leading-none">
+            <span className="text-[#fff23a]">Light</span> <span className="text-[#ff5fae]">Pole</span>
           </span>
         </Link>
         <nav className="flex items-center gap-2 text-sm text-white/70">

@@ -29,6 +29,8 @@ export interface NearbyEvent {
   ends_at: string | null;
   /** Last occurrence date for recurring events, used to show "Until DATE" */
   last_occurrence_date?: string | null;
+  /** Other showings the same day, folded into this card ("+2 more times"). */
+  occurrence_count_remaining?: number;
   venue_id: string;
   venue_name: string;
   venue_address: string | null;

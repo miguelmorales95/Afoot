@@ -25,18 +25,32 @@ body {
     radial-gradient(40% 40% at 80% 10%, rgba(255, 143, 177, 0.10), transparent 70%);
 }
 
-/* Event cards are paper flyers: one bright color each (--paper), a slight tilt (--tilt), and
+/* Poster type: heavy condensed gothic (Colby-style show posters). */
+.font-poster {
+  font-family: var(--font-poster), Impact, "Arial Narrow", sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+/* Event cards are day-glo show posters: one color each (--paper), a slight tilt (--tilt), and
    two staples. Unlayered, so these beat Tailwind utilities on purpose. */
 .flyer {
   position: relative;
-  background: var(--paper, #ffe45c);
+  background-color: var(--paper, #fff23a);
+  /* Faint ink-on-paper vignette, like a letterpress print. */
+  background-image: radial-gradient(120% 90% at 50% 40%, transparent 60%, rgba(0, 0, 0, 0.07));
   color: var(--ink);
-  border-radius: 4px;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.38), 0 1px 0 rgba(0, 0, 0, 0.25);
+  border-radius: 2px;
+  box-shadow: 0 -1px 0 rgba(0, 0, 0, 0.12), 0 6px 14px rgba(0, 0, 0, 0.35);
   transform: rotate(var(--tilt, 0deg));
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 a:hover > .flyer, .flyer:hover { transform: rotate(0deg) translateY(-2px); box-shadow: 0 12px 26px rgba(0, 0, 0, 0.45); }
+
+/* Posters pasted over each other: each one overlaps the bottom of the one above. */
+.flyer-stack > * { position: relative; }
+.flyer-stack > * + * { margin-top: -14px; }
+.flyer-stack > *:hover { z-index: 2; }
 .flyer::before, .flyer::after {
   content: "";
   position: absolute;
@@ -51,7 +65,7 @@ a:hover > .flyer, .flyer:hover { transform: rotate(0deg) translateY(-2px); box-s
 .flyer::after { right: 18px; transform: rotate(3deg); }
 /* Shared parts inside a card (going button, badges, report menu) were drawn for a dark page:
    re-ink them for paper. */
-.flyer [class*="text-white"] { color: rgb(26 26 26 / 0.8); }
+.flyer [class*="text-white"] { color: rgb(17 17 17 / 0.92); }
 .flyer [class*="bg-white/"] { background-color: rgb(0 0 0 / 0.08); }
 .flyer [class*="bg-white/"]:hover { background-color: rgb(0 0 0 / 0.15); }
 .flyer [class*="border-white/"] { border-color: rgb(0 0 0 / 0.15); }
@@ -66,6 +80,10 @@ a:hover > .flyer, .flyer:hover { transform: rotate(0deg) translateY(-2px); box-s
 .flyer [class*="bg-fuchsia-"] { background-color: rgb(157 23 77 / 0.12); }
 .flyer [class*="bg-[#14141c]"] { background-color: #fffdf7; }
 .flyer input::placeholder, .flyer textarea::placeholder { color: rgb(26 26 26 / 0.45); }
+/* "I'm going" on a poster: a solid ink pill with the paper color knocked out. */
+.flyer .going-btn { background: #111; color: var(--paper); font-size: 14px; font-weight: 800; padding: 6px 14px; box-shadow: none; }
+.flyer .going-btn:hover { background: #333; }
+.flyer .going-btn[aria-pressed="true"] { background: transparent; color: #111; box-shadow: inset 0 0 0 2px #111; }
 
 /* Ad slots: show the house promo until AdSense fills the slot, and again if it can't. */
 .ad-slot .ad-fallback { display: block; }

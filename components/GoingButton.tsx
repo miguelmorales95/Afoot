@@ -19,7 +19,8 @@ export default function GoingButton({ ev, compact = false }: { ev: NearbyEvent; 
           e.stopPropagation();
           toggleGoing(ev.occurrence_id);
         }}
-        className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+        aria-pressed={going}
+        className={`going-btn rounded-full px-3 py-1 text-xs font-semibold transition ${
           going
             ? "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/40"
             : "bg-white/10 text-white/80 hover:bg-white/20"
