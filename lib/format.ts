@@ -85,3 +85,75 @@ export function formatShortDate(iso: string): string {
     day: "numeric",
   }).format(new Date(iso));
 }
+
+// Words that carry no meaning on their own: articles, prepositions, pronouns, conjunctions,
+// helper verbs and filler.
+const FILLER = new Set(
+  ("a an the at in on of for to from with by about into onto through over under during until till before after near against " +
+    "between across around via per inside outside along within without upon off out up down " +
+    "i you he she it we they me him her us them my your his its our their this that these those who whom whose which what " +
+    "and or but nor so yet as if than while because " +
+    "is are was were be been being will would can could may might shall should must do does did has have had " +
+    "also just very more most all any each every some no not there here then now plus etc " +
+    "event events held hosted host hosts join come enjoy featuring feature features presents presented " +
+    "nothing something everything anything one " +
+    // Words about the listing itself, not the event.
+    "listing listings listed list given exact hour hours time times session sessions start starts recurring " +
+    "details info information tba tbd website page " +
+    // Street words are part of the location.
+    "avenue ave street st boulevard blvd road rd drive dr way lane ln suite floor").split(" "),
+);
+
+// Dates and times are already on the card.
+const WHEN = new Set(
+  ("today tonight tomorrow all-day weekly daily nightly monthly week weeks weekend weekends day days night nights " +
+    "am pm noon midnight morning afternoon evening runs run running through " +
+    "january february march april may june july august september october november december " +
+    "jan feb mar apr jun jul aug sep sept oct nov dec " +
+    "monday tuesday wednesday thursday friday saturday sunday mon tue tues wed thu thur thurs fri sat sun").split(" "),
+);
+
+const norm = (w: string) => w.toLowerCase().replace(/[\u2018\u2019]/g, "'").replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, "");
+const stem = (w: string) => w.replace(/'s$/, "").replace(/(?<=..)s$/, "");
+const wordsOf = (s: string | null | undefined) =>
+  (s ?? "").split(/[\s\-/,.()&|:;!?"]+/).map(norm).filter(Boolean);
+
+/**
+ * A short description for small screens: the description minus filler words and minus
+ * anything the card already shows (title, venue, address, dates and times, tags, category,
+ * repeat note), first `max` words kept. Empty when fewer than two words are left: a lone
+ * word ("Screening") says nothing the title doesn't.
+ */
+export function briefDescription(
+  ev: {
+    description: string | null; title: string; venue_name: string; venue_address?: string | null;
+    tags?: string[] | null; category: string | null; recurrence_description?: string | null; price?: string | null;
+  },
+  max = 9,
+): string {
+  if (!ev.description) return "";
+  const shown = new Set<string>(["los", "angeles", "la", "ca"]);
+  const cat = categoryMeta(ev.category);
+  for (const w of [
+    ...wordsOf(ev.title), ...wordsOf(ev.venue_name), ...wordsOf(ev.venue_address), ...wordsOf(cat.label),
+    ...wordsOf(ev.category), ...wordsOf(ev.recurrence_description), ...wordsOf(ev.price), ...(ev.tags ?? []).flatMap(wordsOf),
+  ]) {
+    shown.add(w);
+    shown.add(stem(w));
+  }
+
+  const out: string[] = [];
+  const used = new Set<string>();
+  for (const raw of ev.description.split(/\s+/)) {
+    const w = norm(raw);
+    if (!w) continue;
+    const s = stem(w);
+    if (FILLER.has(w) || WHEN.has(w) || WHEN.has(s) || shown.has(w) || shown.has(s) || used.has(s)) continue;
+    // Bare numbers, times and time ranges (7pm, 7:30, 3:00-4:30pm), dates (5th) and years.
+    if (/^\d+([:.]\d+)?(am|pm|st|nd|rd|th|s)?$/.test(w) || /\d:\d|\d\s*(am|pm)\b/.test(w)) continue;
+    used.add(s);
+    out.push(raw.replace(/^[^\p{L}\p{N}$]+|[^\p{L}\p{N}%+]+$/gu, ""));
+    if (out.length >= max) break;
+  }
+  return out.length >= 2 ? out.join(" ") : "";
+}
